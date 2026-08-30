@@ -23,7 +23,7 @@ Top MCP Servers:
 ## Your Setup Checklist
 
 ### Codebases
-- [ ] department-agent — no git remote configured yet; get a copy from Muffasir directly
+- [ ] department-agent — `git clone https://github.com/MUFFASIR289/Texting-agent-with-observability.git`
 
 ### MCP Servers to Activate
 - [ ] _None currently in use — nothing to set up here._
