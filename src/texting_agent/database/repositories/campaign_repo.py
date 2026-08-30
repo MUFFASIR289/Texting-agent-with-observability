@@ -107,6 +107,20 @@ _SQL: dict[str, str] = {
         "offer_json = :offer_json, channels = :channels, rationale = :rationale "
         "WHERE segment_id = :segment_id"
     ),
+    "set_hash": (
+        "UPDATE campaigns SET content_hash = :content_hash, updated_at = :now "
+        "WHERE campaign_id = :campaign_id"
+    ),
+    "insert_approval": (
+        "INSERT INTO campaign_approvals (campaign_id, decision, approver_id, "
+        "content_hash, reason, decided_at) VALUES (:campaign_id, :decision, "
+        ":approver_id, :content_hash, :reason, :decided_at)"
+    ),
+    "list_approvals": (
+        "SELECT campaign_id, decision, approver_id, content_hash, reason, "
+        "decided_at FROM campaign_approvals WHERE campaign_id = :campaign_id "
+        "ORDER BY decided_at"
+    ),
     "insert_run": (
         "INSERT INTO agent_runs (run_id, campaign_id, account_id, stage, model_id, "
         "tokens_in, tokens_out, latency_ms, status, error, trace_id, created_at) "
@@ -256,6 +270,33 @@ class CampaignRepository:
             "rationale": rationale,
         })
         self._conn.commit()
+
+    # --- approval ---------------------------------------------------------
+
+    def set_content_hash(self, campaign_id: str, content_hash: str) -> None:
+        self._conn.execute(_SQL["set_hash"], {
+            "campaign_id": campaign_id, "content_hash": content_hash, "now": _now(),
+        })
+        self._conn.commit()
+
+    def record_decision(self, campaign_id: str, decision: str, approver_id: str,
+                        content_hash: str, reason: str | None = None) -> None:
+        """Who decided what, when, and over which hash `[FR-43]`.
+
+        Append-only: a rejection followed by a later approval leaves both rows,
+        because the history of a decision is part of the decision.
+        """
+        self._conn.execute(_SQL["insert_approval"], {
+            "campaign_id": campaign_id, "decision": decision,
+            "approver_id": approver_id, "content_hash": content_hash,
+            "reason": reason, "decided_at": _now(),
+        })
+        self._conn.commit()
+
+    def list_decisions(self, campaign_id: str) -> list[sqlite3.Row]:
+        return self._conn.execute(
+            _SQL["list_approvals"], {"campaign_id": campaign_id}
+        ).fetchall()
 
     # --- message variants -------------------------------------------------
 

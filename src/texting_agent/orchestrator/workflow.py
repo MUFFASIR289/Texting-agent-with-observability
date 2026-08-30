@@ -6,8 +6,8 @@ account, decides who is targetable, moves the state machine, and writes every
 agent package free of an app-DB connection `[SEC-09]`, and it means no model
 output can advance a campaign.
 
-M5 drives the pipeline as far as `SEGMENTED`. PLAN, GENERATE, validation, the
-audience freeze and the approval hash arrive with M6 and M7.
+The pipeline runs to `AWAITING_APPROVAL` and stops there. Sending is a separate
+call, made by a person, after a person has read the content `[FR-41]`.
 """
 
 from collections import Counter
@@ -23,11 +23,17 @@ from texting_agent.agent.tools import ScopedToolset
 from texting_agent.database.repositories.campaign_repo import CampaignRepository
 from texting_agent.config import settings
 from texting_agent.database.repositories.customer_repo import CustomerRepository
+from texting_agent.orchestrator.approval import content_hash
 from texting_agent.orchestrator.transitions import transition
 from texting_agent.schemas.agent_io import ChurnAnalysis, RetentionPlan
 from texting_agent.schemas.campaign import CampaignState as S
-from texting_agent.schemas.churn import ValueTier
-from texting_agent.services import playbook_service, rendering_service, scoring_config
+from texting_agent.schemas.churn import RiskLevel, ValueTier
+from texting_agent.services import (
+    playbook_service,
+    policy_service,
+    rendering_service,
+    scoring_config,
+)
 from texting_agent.services.rendering_service import TemplateError
 from texting_agent.services.scoring_service import assess_account
 from texting_agent.services.segmentation_service import SegmentAssignment, assign
@@ -54,6 +60,9 @@ class CampaignResult:
     segments: SegmentAssignment | None = None
     plans: list[RetentionPlan] = field(default_factory=list)
     variant_count: int = 0
+    violations: list[dict] = field(default_factory=list)
+    frozen_audience: int = 0
+    content_hash: str | None = None
     targetable_count: int = 0
     excluded_unknown: int = 0
     excluded_stale: int = 0
@@ -71,7 +80,8 @@ class CampaignWorkflow:
         self._campaigns = campaign_repo
         self._client = client
 
-    def run(self, account_id: str, goal: str, created_by: str) -> CampaignResult:
+    def run(self, account_id: str, goal: str, created_by: str,
+            revised_from: str | None = None) -> CampaignResult:
         config = scoring_config.get()
         now = datetime.now(UTC)
 
@@ -87,6 +97,7 @@ class CampaignWorkflow:
             config_version=str(config.version),
             excluded_stale_count=assessment.stale_count,
             excluded_unknown_count=assessment.unknown_count,
+            revised_from=revised_from,
         )
         result = CampaignResult(
             campaign_id=campaign_id, account_id=account_id, state=S.RECEIVED,
@@ -133,6 +144,22 @@ class CampaignWorkflow:
             transition(self._campaigns, campaign_id, S.SEGMENTED, S.PLANNED)
             transition(self._campaigns, campaign_id, S.PLANNED, S.CONTENT_READY)
             result.state = S.CONTENT_READY
+
+            if result.violations:
+                # FR-38: failed with the full list of rule ids, never corrected.
+                # Fixing one violation at a time means running the campaign five
+                # times, so every violation found is reported.
+                return self._fail(
+                    result, "POLICY_VIOLATION",
+                    "; ".join(v["rule_id"] for v in result.violations))
+
+            transition(self._campaigns, campaign_id, S.CONTENT_READY, S.VALIDATED)
+            result.state = S.VALIDATED
+
+            self._freeze_and_hash(campaign_id, account_id, assessment, result,
+                                  segment_ids)
+            transition(self._campaigns, campaign_id, S.VALIDATED, S.AWAITING_APPROVAL)
+            result.state = S.AWAITING_APPROVAL
         except BudgetExceeded as exc:
             return self._fail(result, "BUDGET_EXCEEDED", str(exc))
         except StageFailed as exc:
@@ -203,6 +230,7 @@ class CampaignWorkflow:
         call would let one segment's numbers bleed into another's rationale.
         """
         playbooks = playbook_service.get()
+        policy = policy_service.get()
         render_config = rendering_service.get()
         placeholder_menu = {
             name: f"resolves to the customer's {spec.source}"
@@ -236,10 +264,20 @@ class CampaignWorkflow:
                 result,
             ).output
 
+            # Validated before storage `[VR-05]`-`[VR-08]`. A campaign that
+            # cannot legally be sent is not content worth keeping, and storing
+            # it would only move the failure to send time.
+            result.violations += [
+                v.as_dict() for v in
+                policy_service.check_plan(plan, dominant_tier, playbooks, policy)
+            ]
+            result.violations += [
+                v.as_dict() for v in policy_service.check_variants(
+                    variants.variants, plan.channels, plan.variants_per_channel,
+                    policy, render_config, assigned.customer_ids)
+            ]
+
             for variant in variants.variants:
-                # Validated once per template, before it is stored: a template
-                # nobody can render is not content, and storing it would only
-                # move the failure to send time `[VR-08]`.
                 rendering_service.validate_template(variant.body_template,
                                                     render_config)
                 if variant.subject_template:
@@ -252,6 +290,29 @@ class CampaignWorkflow:
                     cta_text=variant.cta_text, cta_url_key=variant.cta_url_key,
                 )
                 result.variant_count += 1
+
+    def _freeze_and_hash(self, campaign_id: str, account_id: str,
+                         assessment, result: CampaignResult,
+                         segment_ids: dict[str, str]) -> None:
+        """Freeze the audience, then hash it with the content `[FR-42]`,
+        `[FR-42a]`.
+
+        Order matters: hashing before the freeze would leave the audience free
+        to change under an approval that had already been given.
+        """
+        lapsed = {
+            entry.customer_id: entry.risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL)
+            for entry in assessment.assessed
+        }
+        for assigned in result.segments.segments:
+            self._campaigns.freeze_targets(
+                campaign_id, account_id, segment_ids[assigned.segment.name],
+                [(customer_id, lapsed.get(customer_id, False))
+                 for customer_id in assigned.customer_ids],
+            )
+        result.frozen_audience = self._campaigns.count_targets(campaign_id)
+        result.content_hash = content_hash(self._campaigns, campaign_id)
+        self._campaigns.set_content_hash(campaign_id, result.content_hash)
 
 
     def _fail(self, result: CampaignResult, code: str, detail: str) -> CampaignResult:

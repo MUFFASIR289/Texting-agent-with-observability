@@ -11,6 +11,7 @@ from texting_agent.deps import authenticate
 from texting_agent.observability.logging import configure_logging
 from texting_agent.services import (
     playbook_service,
+    policy_service,
     rendering_service,
     scoring_config,
 )
@@ -27,10 +28,12 @@ async def lifespan(app: FastAPI):
     scoring = scoring_config.get()
     playbooks = playbook_service.get()
     placeholders = rendering_service.get()
+    policy = policy_service.get()
     log.info("service.start", env=settings.env, port=settings.port,
              scoring_config_version=scoring.version,
              playbook_count=len(playbooks.playbooks),
              placeholder_count=len(placeholders.placeholders),
+             policy_version=policy.version,
              api_keys_configured=len(settings.api_keys),
              llm_configured=bool(settings.openai_api_key))
     if not settings.openai_api_key:

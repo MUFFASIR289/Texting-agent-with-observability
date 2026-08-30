@@ -26,11 +26,13 @@ from texting_agent.deps import (
     RequestContext,
     rate_limit,
     require_account,
+    require_approver,
     require_operator,
 )
 from texting_agent.integrations.openai_client import OpenAILLMClient
+from texting_agent.orchestrator.transitions import InvalidTransition, transition
 from texting_agent.orchestrator.workflow import CampaignWorkflow
-from texting_agent.schemas.campaign import Channel
+from texting_agent.schemas.campaign import CampaignState, Channel
 from texting_agent.schemas.churn import ValueTier
 from texting_agent.services import rendering_service, scoring_config
 from texting_agent.services.rendering_service import RenderContext
@@ -42,6 +44,7 @@ log = structlog.get_logger()
 router = APIRouter(tags=["campaigns"])
 
 Operator = Annotated[RequestContext, Depends(require_operator)]
+Approver = Annotated[RequestContext, Depends(require_approver)]
 
 
 class CreateCampaign(BaseModel):
@@ -185,6 +188,124 @@ def get_messages(campaign_id: str, context: Operator) -> dict:
     return {"variants": rendered, "count": len(rendered)}
 
 
+class Decision(BaseModel):
+    note: str | None = Field(default=None, max_length=500)
+
+
+class Rejection(BaseModel):
+    reason: str = Field(min_length=1, max_length=500,
+                        examples=["The 25% discount is too generous for this segment"])
+
+
+@router.post("/campaigns/{campaign_id}/approve")
+def approve_campaign(campaign_id: str, body: Decision,
+                     context: Approver) -> dict:
+    """Approve a specific campaign: this copy, this offer, to these people.
+
+    The hash recorded here is what send time re-verifies. Approving is guarded by
+    a conditional UPDATE, so two approvers pressing the button together produce
+    exactly one approval `[FR-43]`, `[FR-44]`, `[EC-12]`.
+    """
+    repo = campaign_repository()
+    campaign = _campaign_or_404(repo, context, campaign_id)
+    stored_hash = campaign["content_hash"] or ""
+
+    _decide(repo, campaign_id, CampaignState.APPROVED)
+    repo.record_decision(campaign_id, decision="APPROVED",
+                         approver_id=context.key_id, content_hash=stored_hash,
+                         reason=body.note)
+    log.info("campaign.approved", campaign_id=campaign_id,
+             approver=context.key_id)
+    return {"campaign_id": campaign_id, "state": CampaignState.APPROVED.value,
+            "approved_by": context.key_id, "content_hash": stored_hash}
+
+
+@router.post("/campaigns/{campaign_id}/reject")
+def reject_campaign(campaign_id: str, body: Rejection, context: Approver) -> dict:
+    """Reject with a reason `[FR-47]`. The reason is not decoration: `revise`
+    hands it to the agent as operator feedback."""
+    repo = campaign_repository()
+    campaign = _campaign_or_404(repo, context, campaign_id)
+    _decide(repo, campaign_id, CampaignState.REJECTED)
+    repo.record_decision(campaign_id, decision="REJECTED",
+                         approver_id=context.key_id,
+                         content_hash=campaign["content_hash"] or "",
+                         reason=body.reason)
+    return {"campaign_id": campaign_id, "state": CampaignState.REJECTED.value,
+            "reason": body.reason}
+
+
+@router.post("/campaigns/{campaign_id}/cancel")
+def cancel_campaign(campaign_id: str, context: Operator) -> dict:
+    """Any non-terminal campaign, by an operator `[FR-48]`. Cancelling is not a
+    decision about content, so it needs no approver."""
+    repo = campaign_repository()
+    campaign = _campaign_or_404(repo, context, campaign_id)
+    current = CampaignState(campaign["state"])
+    try:
+        transition(repo, campaign_id, current, CampaignState.CANCELLED)
+    except InvalidTransition as exc:
+        raise _conflict(exc) from exc
+    return {"campaign_id": campaign_id, "state": CampaignState.CANCELLED.value}
+
+
+@router.post("/campaigns/{campaign_id}/revise", dependencies=[Depends(rate_limit)])
+def revise_campaign(campaign_id: str, context: Operator) -> dict:
+    """Clone a REJECTED or FAILED campaign into a fresh run `[FR-48a]`.
+
+    The original stays terminal. Re-running the same campaign id would erase the
+    record of what was rejected and why, which is the only thing that makes a
+    rejection useful.
+    """
+    repo = campaign_repository()
+    campaign = _campaign_or_404(repo, context, campaign_id)
+    current = CampaignState(campaign["state"])
+    if current not in (CampaignState.REJECTED, CampaignState.FAILED):
+        raise APIError(409, "INVALID_STATE",
+                       "Only a rejected or failed campaign can be revised.",
+                       [{"current": current.value,
+                         "allowed": ["REJECTED", "FAILED"]}])
+
+    feedback = _revision_feedback(repo, campaign, current)
+    budget = TokenBudget(settings.token_budget_per_campaign)
+    workflow = CampaignWorkflow(customer_repository(), repo, llm_client(budget))
+    goal = f"{campaign['goal']}\n\nPrevious attempt feedback: {feedback}"
+    result = workflow.run(campaign["account_id"], goal,
+                          created_by=context.key_id, revised_from=campaign_id)
+    return _serialise(result)
+
+
+def _decide(repo: CampaignRepository, campaign_id: str,
+            decision: CampaignState) -> None:
+    """Approval and rejection are only legal from AWAITING_APPROVAL, and the
+    conditional UPDATE is what makes "exactly one wins" true rather than
+    likely `[FR-44]`, `[EC-11]`, `[EC-12]`."""
+    if not repo.try_transition(campaign_id, CampaignState.AWAITING_APPROVAL,
+                               decision):
+        current = repo.current_state(campaign_id) or "missing"
+        raise APIError(409, "INVALID_STATE",
+                       f"This campaign is {current}, not awaiting approval.",
+                       [{"current": current, "requested": decision.value}])
+
+
+def _conflict(exc: InvalidTransition) -> APIError:
+    return APIError(409, "INVALID_STATE",
+                    f"A campaign in {exc.current} cannot move to "
+                    f"{exc.requested.value}.",
+                    [{"current": str(exc.current),
+                      "requested": exc.requested.value}])
+
+
+def _revision_feedback(repo: CampaignRepository, campaign,
+                       current: CampaignState) -> str:
+    if current is CampaignState.REJECTED:
+        decisions = [d for d in repo.list_decisions(campaign["campaign_id"])
+                     if d["decision"] == "REJECTED"]
+        if decisions:
+            return decisions[-1]["reason"] or "rejected without a stated reason"
+    return campaign["failure_detail"] or "the previous attempt failed"
+
+
 @router.post("/agent/query", dependencies=[Depends(rate_limit)])
 def agent_query(body: AgentQuery, context: Operator) -> dict:
     """A grounded answer plus the tools it rests on `[FR-65]`."""
@@ -283,6 +404,9 @@ def _serialise(result) -> dict:
             for p in result.plans
         ],
         "variant_count": result.variant_count,
+        "violations": result.violations,
+        "frozen_audience": result.frozen_audience,
+        "content_hash": result.content_hash,
         "tokens_used": result.tokens_used,
         "failure": ({"code": result.failure_code, "detail": result.failure_detail}
                     if result.failure_code else None),

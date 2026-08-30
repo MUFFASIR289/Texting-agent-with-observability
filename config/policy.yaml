@@ -1,0 +1,35 @@
+# Business policy `[FR-37]`. Rules are data; the engine is a loop.
+#
+# A violation fails the campaign with the rule id. Nothing here is ever applied
+# by silently correcting the content: a 50% discount quietly reduced to 20% hides
+# either a broken prompt or a broken policy, and both need to be seen `[FR-38]`.
+version: 1
+
+offers:
+  allowed_types: [PERCENTAGE_DISCOUNT, FIXED_DISCOUNT, LOYALTY_POINTS,
+                  FREE_SHIPPING, EARLY_ACCESS, NONE]
+  # A VIP is worth more, so more may be spent keeping them.
+  max_discount_pct_by_tier: { VIP: 25, HIGH_VALUE: 20, STANDARD: 15, LOW_VALUE: 10 }
+  max_fixed_discount: 50
+  max_loyalty_points: 5000
+
+messages:
+  sms_max_chars: 320                 # the provider limit, not the prompt budget
+  email_footer_required: true
+  banned_phrases: ["guaranteed", "risk free", "risk-free", "act now or lose",
+                   "final warning", "last chance ever", "no strings attached"]
+  allowed_cta_url_keys: [shop_now, view_offer, account_home, support]
+
+frequency:
+  # Across ALL campaigns, not just this one. An EMAIL_SMS campaign spends both
+  # at once, which is intentional and reachable now that v1 sends one message
+  # per channel with no follow-ups.
+  max_messages_per_customer: 2
+  window_days: 14
+
+analytics:
+  attribution_window_days: 14        # a CONVERTED event counts only inside this
+
+costs:
+  email_cost: 0.001
+  sms_cost: 0.01

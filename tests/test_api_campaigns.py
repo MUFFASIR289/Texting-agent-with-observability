@@ -43,6 +43,7 @@ NOW = datetime.now(UTC)
 OPS_SECRET = "operator-secret-for-routes"
 APPROVER_SECRET = "approver-secret-for-routes"
 OTHER_SECRET = "other-tenant-secret-value"
+OTHER_APPROVER_SECRET = "other-tenant-approver-secret"
 
 ANALYSIS = ChurnAnalysis(
     headline="Buyers have gone quiet.",
@@ -96,6 +97,8 @@ def wired(monkeypatch, tmp_path):
                accounts=["ACC_A"]),
         ApiKey(key_id="other-1", secret=OTHER_SECRET, role=Role.OPERATOR,
                accounts=["ACC_OTHER"]),
+        ApiKey(key_id="other-appr-1", secret=OTHER_APPROVER_SECRET,
+               role=Role.APPROVER, accounts=["ACC_OTHER"]),
     ])
     deps.reset_rate_limits()
 
@@ -155,11 +158,11 @@ def script(stub, *outputs):
 # --- creating a campaign ---------------------------------------------------
 
 
-def test_a_campaign_runs_through_to_content_ready(client, wired):
+def test_a_campaign_runs_through_to_awaiting_approval(client, wired):
     script(wired, *full_run("Critical lapsed", "Everyone else"))
     body = client.post("/campaigns", headers=ops(),
                        json={"account_id": "ACC_A", "goal": "win them back"}).json()
-    assert body["state"] == "CONTENT_READY"
+    assert body["state"] == "AWAITING_APPROVAL"
     assert body["analysis"]["headline"] == "Buyers have gone quiet."
     assert sum(s["size"] for s in body["segments"]) == body["targetable_customers"]
     # Every fixture customer is CRITICAL, so the catch-all segment matches
@@ -169,6 +172,9 @@ def test_a_campaign_runs_through_to_content_ready(client, wired):
     assert body["tokens_used"] == 600
     assert body["variant_count"] == 2
     assert body["plans"][0]["playbook_id"] == "DORMANT"
+    assert body["violations"] == []
+    assert body["frozen_audience"] == body["targetable_customers"]
+    assert len(body["content_hash"]) == 64
 
 
 def test_the_response_reports_what_was_excluded(client, wired):
