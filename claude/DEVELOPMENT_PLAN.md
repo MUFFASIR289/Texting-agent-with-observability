@@ -287,10 +287,10 @@ returns grounded totals, patterns and cohorts.
 
 **Definition of Done**
 - [x] Each segment carries a playbook, an offer, a justified channel decision and ≥2 variants `[AC-2]`
-- [ ] Generated content contains no literal name, email, phone or order id `[FR-25]` — *the content-safety validator is M7 task 7.4; the schema and prompt forbid it, but nothing yet rejects it*
+- [x] Generated content contains no literal name, email, phone or order id `[FR-25]` — *closed by M7 task 7.4*
 - [x] Every preview renders with all placeholders resolved `[AC-3]`
 - [x] Rendering fails closed in every unresolved case
-- [ ] Generated content contains no `customer_id` literal `[FR-25]` — *same: M7 task 7.4*
+- [x] Generated content contains no `customer_id` literal `[FR-25]` — *closed by M7 task 7.4*
 - [ ] **A human reads the generated copy and judges it sendable.** If it is not, that is a model-tier signal — raise `OPENAI_MODEL_GENERATE`, do not patch the prompt around it `[R15]`
 
 ---
@@ -304,7 +304,7 @@ returns grounded totals, patterns and cohorts.
 | 7.1 | `config/policy.yaml` + validating model |
 | 7.2 | `policy_service.py` — offer caps by tier, allowed types, SMS length, footer, banned phrases, forbidden literals incl. `customer_id`, CTA-key allowlist. No quiet hours `[FR-37]` |
 | 7.3 | Business-rule validation layer `[FR-36]` |
-| 7.4 | Content-safety validation — no email/phone/URL-outside-allowlist/name-shaped literals `[VR-07]` |
+| 7.4 | Content-safety validation — no email, phone, URL, order number or `customer_id` literal `[VR-07]`. Placeholders are stripped before the check, or the rule would fire on `{{first_name}}` and leave no compliant template that greets anybody |
 | 7.5 | Violations fail the campaign with rule ids; never auto-corrected `[FR-38]`, ADR-06 |
 | 7.6 | Freeze audience into `campaign_targets`, hash content + offer + recipient list, transition to `AWAITING_APPROVAL` `[FR-42]`, `[FR-42a]` |
 | 7.7 | `approve` / `reject` / `cancel` endpoints, role-gated, idempotent, state-guarded `[FR-43]`–`[FR-48]` |
@@ -316,10 +316,12 @@ returns grounded totals, patterns and cohorts.
 approved; a policy-violating campaign rejected with a named rule.
 
 **Definition of Done**
-- [ ] A cap-exceeding offer never reaches `AWAITING_APPROVAL` `[AC-4]`
-- [ ] Nothing is silently rewritten to fit policy
-- [ ] Approval is idempotent and role-gated `[AC-5]`
-- [ ] Every validation result is persisted and returned `[FR-39]`
+- [x] A cap-exceeding offer never reaches `AWAITING_APPROVAL` `[AC-4]`
+- [x] Nothing is silently rewritten to fit policy
+- [x] Approval is idempotent and role-gated `[AC-5]`
+- [x] Every validation result is persisted and returned `[FR-39]`
+- [x] The approval hash covers content, offer **and** the frozen audience `[SEC-10]`
+- [x] Two concurrent approvals produce exactly one approval `[EC-12]`
 - [ ] Altering `campaign_targets` after approval breaks the hash and blocks the send `[EC-28]`
 
 ---

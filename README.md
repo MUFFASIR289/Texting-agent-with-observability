@@ -116,5 +116,13 @@ fails closed — an unknown placeholder fails the campaign, an unresolvable one 
 that customer with a recorded reason. `GET /campaigns/{id}/messages` previews each
 variant against a real targeted customer.
 
-Next: **M7 (Validation, Policy & Approval)** — offer caps, content safety, the frozen
-audience and the approval hash.
+**M7 (Validation, Policy & Approval)** complete: offer caps per value tier, banned
+phrases, CTA-key and placeholder allowlists, and forbidden-literal checks including
+`customer_id`. Violations are reported with rule ids and never corrected. The
+audience is frozen into `campaign_targets` and the SHA-256 hash covers content,
+offer and audience together, so nothing can change under an approval. The pipeline
+stops at `AWAITING_APPROVAL`; approve, reject, cancel and revise are role-gated and
+state-guarded.
+
+Next: **M8 (Communication & Sending)** — the send gates, mock providers and the
+send log.

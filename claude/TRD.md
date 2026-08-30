@@ -790,6 +790,13 @@ recorded in the post-MVP list; it returns with the background worker `[RV-A3]`.
 is intentional and now reachable, because v1 sends one message per channel and no
 follow-ups `[RV-C6]`.
 
+A **name-shaped literal** rule was specified and is deliberately not implemented.
+Every workable pattern for it — a capitalised word, two capitalised words — fires on
+"Free Shipping", "Black Friday" and the brand name itself, and the false positives
+would fail campaigns for writing ordinary English. The identifiers that actually
+matter are covered exactly: email, phone, URL, order number and `customer_id`, the
+last being the only customer identifier the model ever receives `[RV-M7a]`.
+
 Each violation returns `(rule_id, message, observed, allowed)`. The campaign goes to
 `FAILED` with the full list — the system never silently rewrites a 50% discount down
 to 20%, because a silently corrected campaign hides a broken prompt or a broken
@@ -1212,8 +1219,8 @@ API when `RUN_LIVE_LLM_TESTS=1`.
 ## 16. Deviations from the Original Specification
 
 Rows 1–10 are deviations decided when the specification was first reviewed; rows
-11–18 came out of the design review of this document set; rows 19–20 were
-raised while implementing M2. Citations of the form
+11–18 came out of the design review of this document set; rows 19–21 were
+raised while implementing M2 and M7. Citations of the form
 `[RV-xx]` elsewhere in this document refer to that review's finding ids — `RV-A*`
 contradictions, `RV-B*` modelling defects, `RV-C*` gaps, `RV-D*` unverified choices.
 `RV-M<n>*` ids are findings raised during implementation of that milestone.
@@ -1241,3 +1248,4 @@ They are distinct from the PRD's assumption ids (`[A1]`–`[A9]`).
 | 18 | Model tier unspecified | `gpt-5-nano` on all six call sites, each independently overridable | Cheapest available (~$0.008/campaign); per-stage variables make a quality problem a one-line fix |
 | 19 | `min_signals_required` over "signals with data present" | Zero-valued counters score but do not satisfy the gate `[RV-M2a]` | The counters are `NOT NULL DEFAULT 0`, so the literal reading makes `UNKNOWN` unreachable and `[FR-04c]` untestable |
 | 20 | Value tier keyed on having purchased | Keyed on `total_orders > 0 AND total_spend > 0` | A missing `last_purchase_at` disables the purchase-gap signal (DQ-04); it does not make the money on the account disappear |
+| 21 | Content safety includes a "name-shaped literal" rule | Not implemented; the other five literal rules are `[RV-M7a]` | Every workable pattern fires on "Free Shipping" and the brand name itself, failing campaigns for writing ordinary English |
