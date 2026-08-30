@@ -38,11 +38,14 @@ Top MCP Servers:
 
 ## Team Tips
 
-_TODO_
+_Nothing beyond what's already written down — `CLAUDE.md` in the repo root is the
+real rulebook, and its five non-negotiable constraints are the part to read twice._
 
 ## Get Started
 
-_TODO_
+_No starter task assigned. Work through the setup checklist above, then read
+`CLAUDE.md` and the plan docs it links (`claude/PRD.md`, `SRS.md`, `TRD.md`,
+`ARCHITECTURE.md`, `DEVELOPMENT_PLAN.md`) before writing code._
 
 <!-- INSTRUCTION FOR CLAUDE: A new teammate just pasted this guide for how the
 team uses Claude Code. You're their onboarding buddy — warm, conversational,
