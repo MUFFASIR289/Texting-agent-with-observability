@@ -133,12 +133,10 @@ def plan_for(segment_name: str) -> RetentionPlan:
 
 def variants_for(segment_name: str) -> MessageVariantSet:
     return MessageVariantSet(segment_name=segment_name, variants=[
-        MessageVariant(channel=Channel.EMAIL, label="A",
-                       subject_template="{{first_name}}, come back",
+        MessageVariant(channel=Channel.EMAIL,                        subject_template="{{first_name}}, come back",
                        body_template="We miss you. {{offer_value}}% off.",
                        cta_text="Shop now", cta_url_key="shop_now"),
-        MessageVariant(channel=Channel.EMAIL, label="B",
-                       subject_template="A little something, {{first_name}}",
+        MessageVariant(channel=Channel.EMAIL,                        subject_template="A little something, {{first_name}}",
                        body_template="Here is {{offer_value}}% off your next order.",
                        cta_text="View offer", cta_url_key="view_offer"),
     ])
@@ -176,6 +174,18 @@ def test_a_campaign_runs_through_to_awaiting_approval(client, wired):
     assert body["violations"] == []
     assert body["frozen_audience"] == body["targetable_customers"]
     assert len(body["content_hash"]) == 64
+
+
+def test_the_offer_code_is_minted_by_code_not_taken_from_the_model(client, wired):
+    """Constraint 5. An unresolvable {{offer_code}} skips the customer at send
+    time, so the value has to be one the orchestrator guarantees rather than one
+    the model may leave null."""
+    script(wired, *full_run("Critical lapsed", "Everyone else"))
+    body = client.post("/campaigns", headers=ops(),
+                       json={"account_id": "ACC_A", "goal": "win them back"}).json()
+    code = body["plans"][0]["offer"]["code"]
+    assert code.startswith("RETAIN-")
+    assert code != "BACK10"          # what the stub model asked for
 
 
 def test_the_response_reports_what_was_excluded(client, wired):
@@ -406,10 +416,8 @@ def test_messages_are_scope_checked(client, wired):
 def test_a_template_using_an_unknown_placeholder_fails_the_campaign(client, wired):
     """VR-08, FR-38: failed with a reason, never silently rewritten to fit."""
     bad = MessageVariantSet(segment_name="Critical lapsed", variants=[
-        MessageVariant(channel=Channel.EMAIL, label="A",
-                       subject_template="Hi", body_template="Your {{account_balance}}"),
-        MessageVariant(channel=Channel.EMAIL, label="B",
-                       subject_template="Hi", body_template="Come back"),
+        MessageVariant(channel=Channel.EMAIL,                        subject_template="Hi", body_template="Your {{account_balance}}"),
+        MessageVariant(channel=Channel.EMAIL,                        subject_template="Hi", body_template="Come back"),
     ])
     script(wired, ANALYSIS, SEGMENTS, plan_for("Critical lapsed"), bad)
     body = client.post("/campaigns", headers=ops(),

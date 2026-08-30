@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field
 
 from texting_agent.config import settings
 from texting_agent.schemas.agent_io import MessageVariant, RetentionPlan
-from texting_agent.schemas.campaign import Channel, OfferType
+from texting_agent.schemas.campaign import Channel, CtaUrlKey, OfferType
 from texting_agent.schemas.churn import ValueTier
 from texting_agent.services.playbook_service import PlaybookConfig
 from texting_agent.services.rendering_service import RenderConfig, placeholders_in
@@ -96,6 +96,15 @@ def load(path: Path | str | None = None) -> PolicyConfig:
     missing = [t for t in ValueTier if t not in config.offers.max_discount_pct_by_tier]
     if missing:
         raise ValueError(f"no discount cap for tiers: {[t.value for t in missing]}")
+    # The model picks from `CtaUrlKey`, so a key allowed here that is not in the
+    # enum is unreachable, and one in the enum but not here fails validation
+    # every time. Either way the two must say the same thing.
+    if {k.value for k in CtaUrlKey} != set(config.messages.allowed_cta_url_keys):
+        raise ValueError(
+            "allowed_cta_url_keys does not match CtaUrlKey: "
+            f"{sorted(config.messages.allowed_cta_url_keys)} != "
+            f"{sorted(k.value for k in CtaUrlKey)}"
+        )
     return config
 
 
@@ -171,24 +180,17 @@ def check_variants(variants: list[MessageVariant], channels: list[Channel],
                 f"{channel.value} needs {variants_per_channel} variants to compare",
                 observed=len(for_channel), allowed=variants_per_channel,
             ))
-        labels = [v.label for v in for_channel]
-        if len(set(labels)) != len(labels):
-            violations.append(Violation(
-                "VARIANT_LABELS_NOT_DISTINCT",
-                f"{channel.value} variants must have distinct labels",
-                observed=labels,
-            ))
-
-    for variant in variants:
-        violations += _check_variant(variant, policy, render_config, customer_ids or [])
+    for position, variant in enumerate(variants, start=1):
+        violations += _check_variant(variant, position, policy, render_config,
+                                     customer_ids or [])
     return violations
 
 
-def _check_variant(variant: MessageVariant, policy: PolicyConfig,
+def _check_variant(variant: MessageVariant, position: int, policy: PolicyConfig,
                    render_config: RenderConfig,
                    customer_ids: list[str]) -> list[Violation]:
     violations: list[Violation] = []
-    where = f"{variant.channel.value} variant {variant.label}"
+    where = f"{variant.channel.value} variant {position}"
     text = " ".join(filter(None, [variant.subject_template, variant.body_template,
                                   variant.cta_text]))
 

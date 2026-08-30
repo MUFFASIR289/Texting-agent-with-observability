@@ -13,6 +13,7 @@ call, made by a person, after a person has read the content `[FR-41]`.
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from string import ascii_uppercase
 
 import structlog
 
@@ -27,6 +28,7 @@ from texting_agent.orchestrator.approval import content_hash
 from texting_agent.orchestrator.transitions import transition
 from texting_agent.schemas.agent_io import ChurnAnalysis, RetentionPlan
 from texting_agent.schemas.campaign import CampaignState as S
+from texting_agent.schemas.campaign import OfferType
 from texting_agent.schemas.churn import RiskLevel, ValueTier
 from texting_agent.services import (
     playbook_service,
@@ -248,6 +250,16 @@ class CampaignWorkflow:
                     s.name, s.hypothesis, a.size, s.predicate, t, playbooks),
                 result,
             ).output
+
+            # The code is minted here, not asked for. It has to be unique and it
+            # has to resolve at render time or the customer is skipped, which
+            # makes it code's job `[constraint 5]` - the same reasoning that
+            # keeps footers out of the model's hands `[FR-32]`. No code is
+            # minted for OfferType.NONE: a redeemable-looking code with nothing
+            # behind it is a promise the campaign cannot keep.
+            if plan.offer.type is not OfferType.NONE:
+                plan.offer.code = f"RETAIN-{segment_ids[segment.name][:6]}".upper()
+
             self._campaigns.set_plan(
                 segment_ids[segment.name], playbook_id=plan.playbook_id.value,
                 offer=plan.offer.model_dump(mode="json"),
@@ -277,15 +289,22 @@ class CampaignWorkflow:
                     policy, render_config, assigned.customer_ids)
             ]
 
+            # Labels are assigned here, not asked for: two variants sharing
+            # one label breaks the A/B split, and anything that must be correct
+            # is code's job rather than the model's `[constraint 5]`.
+            next_label: dict[str, int] = {}
             for variant in variants.variants:
                 rendering_service.validate_template(variant.body_template,
                                                     render_config)
                 if variant.subject_template:
                     rendering_service.validate_template(variant.subject_template,
                                                         render_config)
+                position = next_label.get(variant.channel.value, 0)
+                next_label[variant.channel.value] = position + 1
                 self._campaigns.add_variant(
                     segment_ids[segment.name], channel=variant.channel.value,
-                    label=variant.label, body_template=variant.body_template,
+                    label=ascii_uppercase[position],
+                    body_template=variant.body_template,
                     subject_template=variant.subject_template,
                     cta_text=variant.cta_text, cta_url_key=variant.cta_url_key,
                 )

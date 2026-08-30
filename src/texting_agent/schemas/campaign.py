@@ -33,6 +33,21 @@ class PlaybookId(StrEnum):
     SUPPORT_RECOVERY = "SUPPORT_RECOVERY"
 
 
+class CtaUrlKey(StrEnum):
+    """The keys a template may point a call to action at.
+
+    Closed for the same reason the rest of this file is: the model cannot be
+    told a URL, so it names a key, and a key it invents must not be
+    expressible. Kept in step with `allowed_cta_url_keys` in policy.yaml by a
+    check in `policy_service.load`.
+    """
+
+    SHOP_NOW = "shop_now"
+    VIEW_OFFER = "view_offer"
+    ACCOUNT_HOME = "account_home"
+    SUPPORT = "support"
+
+
 class CampaignState(StrEnum):
     """Thirteen states `[FR-63]`. The orchestrator owns transitions; the model
     has no way to name one."""

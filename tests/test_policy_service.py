@@ -5,6 +5,7 @@ quietly reduced to fit policy hides a broken prompt or a broken policy.
 """
 
 import pytest
+from pydantic import ValidationError
 
 from texting_agent.schemas.agent_io import MessageVariant, Offer, RetentionPlan
 from texting_agent.schemas.campaign import Channel, OfferType, PlaybookId
@@ -38,11 +39,24 @@ def plan(offer_type=OfferType.PERCENTAGE_DISCOUNT, value=10,
     )
 
 
-def variant(channel=Channel.EMAIL, label="A", body="Come back soon.",
+def variant(channel=Channel.EMAIL, body="Come back soon.",
             subject="A subject", cta_key=None, cta_text=None) -> MessageVariant:
-    return MessageVariant(channel=channel, label=label, body_template=body,
+    return MessageVariant(channel=channel, body_template=body,
                           subject_template=subject if channel is Channel.EMAIL else None,
                           cta_url_key=cta_key, cta_text=cta_text)
+
+
+def unvalidated_variant(body="Come back soon.",
+                        cta_key="evil_site") -> MessageVariant:
+    """A variant whose CTA key the schema would refuse.
+
+    `cta_url_key` is a closed enum, so the model can no longer say this. Policy
+    still checks it because a variant is also rebuilt from the database, where
+    nothing re-runs schema validation.
+    """
+    return MessageVariant.model_construct(
+        channel=Channel.EMAIL, body_template=body,
+        subject_template="A subject", cta_url_key=cta_key, cta_text=None)
 
 
 def rule_ids(violations) -> list[str]:
@@ -128,7 +142,7 @@ def check(variants, policy, render_config, channels=(Channel.EMAIL,),
 
 
 def test_two_distinct_variants_per_channel_pass(policy, render_config):
-    assert check([variant(label="A"), variant(label="B", body="Different copy.")],
+    assert check([variant(), variant(body="Different copy.")],
                  policy, render_config) == []
 
 
@@ -139,41 +153,43 @@ def test_one_variant_is_not_an_ab_test(policy, render_config):
     assert violations[0].observed == 1
 
 
-def test_duplicate_labels_are_rejected(policy, render_config):
-    violations = check([variant(label="A"), variant(label="A")], policy, render_config)
-    assert "VARIANT_LABELS_NOT_DISTINCT" in rule_ids(violations)
-
-
 def test_an_email_without_a_subject_is_rejected(policy, render_config):
-    bad = MessageVariant(channel=Channel.EMAIL, label="A", body_template="Body")
-    violations = check([bad, variant(label="B")], policy, render_config)
+    bad = MessageVariant(channel=Channel.EMAIL, body_template="Body")
+    violations = check([bad, variant()], policy, render_config)
     assert "EMAIL_NO_SUBJECT" in rule_ids(violations)
 
 
 def test_an_over_long_sms_is_rejected(policy, render_config):
     long_body = "x" * (policy.messages.sms_max_chars + 1)
-    violations = check([variant(channel=Channel.SMS, label="A", body=long_body),
-                        variant(channel=Channel.SMS, label="B", body="short")],
+    violations = check([variant(channel=Channel.SMS, body=long_body),
+                        variant(channel=Channel.SMS, body="short")],
                        policy, render_config, channels=(Channel.SMS,))
     assert "SMS_TOO_LONG" in rule_ids(violations)
 
 
 @pytest.mark.parametrize("phrase", ["guaranteed", "risk free", "FINAL WARNING"])
 def test_banned_phrases_are_caught_whatever_the_case(policy, render_config, phrase):
-    violations = check([variant(label="A", body=f"This is {phrase}!"),
-                        variant(label="B")], policy, render_config)
+    violations = check([variant(body=f"This is {phrase}!"),
+                        variant()], policy, render_config)
     assert "BANNED_PHRASE" in rule_ids(violations)
 
 
 def test_an_unknown_cta_key_is_rejected(policy, render_config):
-    violations = check([variant(label="A", cta_key="evil_site"), variant(label="B")],
+    violations = check([unvalidated_variant(), variant()],
                        policy, render_config)
     assert "CTA_KEY_NOT_ALLOWED" in rule_ids(violations)
 
 
+def test_the_schema_refuses_an_invented_cta_key():
+    """The stronger half of the same guarantee: policy rejects a bad key, and
+    the schema stops the model producing one in the first place."""
+    with pytest.raises(ValidationError):
+        variant(cta_key="evil_site")
+
+
 def test_an_unknown_placeholder_is_rejected(policy, render_config):
-    violations = check([variant(label="A", body="Your {{account_balance}}"),
-                        variant(label="B")], policy, render_config)
+    violations = check([variant(body="Your {{account_balance}}"),
+                        variant()], policy, render_config)
     assert "PLACEHOLDER_NOT_ALLOWED" in rule_ids(violations)
 
 
@@ -190,7 +206,7 @@ def test_an_unknown_placeholder_is_rejected(policy, render_config):
 )
 def test_customer_particulars_in_content_are_rejected(policy, render_config,
                                                       body, expected):
-    violations = check([variant(label="A", body=body), variant(label="B")],
+    violations = check([variant(body=body), variant()],
                        policy, render_config)
     assert expected in rule_ids(violations)
 
@@ -198,8 +214,8 @@ def test_customer_particulars_in_content_are_rejected(policy, render_config,
 def test_a_customer_id_in_content_is_rejected(policy, render_config):
     """The sharpest rule: customer_id is the only identifier the model actually
     receives, so it is the only one it could plausibly paste in."""
-    violations = check([variant(label="A", body="Hi A01221, come back"),
-                        variant(label="B")],
+    violations = check([variant(body="Hi A01221, come back"),
+                        variant()],
                        policy, render_config, customer_ids=["A01221", "A00002"])
     assert "LITERAL_CUSTOMER_ID" in rule_ids(violations)
     assert violations[0].observed == "A01221"
@@ -208,26 +224,25 @@ def test_a_customer_id_in_content_is_rejected(policy, render_config):
 def test_placeholders_are_not_mistaken_for_literals(policy, render_config):
     """{{first_name}} is the correct way to address someone. If this rule fired
     on it, the only compliant template would be one that greets nobody."""
-    good = [variant(label="A", body="Hi {{first_name}}, {{offer_value}}% off",
+    good = [variant(body="Hi {{first_name}}, {{offer_value}}% off",
                     subject="{{first_name}}, come back"),
-            variant(label="B", body="{{brand_name}} misses you")]
+            variant(body="{{brand_name}} misses you")]
     assert check(good, policy, render_config, customer_ids=["A01221"]) == []
 
 
 def test_a_url_inside_a_placeholder_is_fine(policy, render_config):
     """The unsubscribe URL arrives through a placeholder, so the literal-URL rule
     must not fire on the one link every message is required to carry."""
-    assert check([variant(label="A", body="Bye. {{unsubscribe_url}}"),
-                  variant(label="B", body="See you. {{unsubscribe_url}}")],
+    assert check([variant(body="Bye. {{unsubscribe_url}}"),
+                  variant(body="See you. {{unsubscribe_url}}")],
                  policy, render_config) == []
 
 
 def test_several_violations_are_all_reported(policy, render_config):
     """An operator fixing one problem at a time is an operator running the
     campaign five times."""
-    violations = check([variant(label="A", body="Guaranteed! Call 555-123-4567",
-                                cta_key="evil_site")],
-                       policy, render_config)
+    violations = check([unvalidated_variant(
+        body="Guaranteed! Call 555-123-4567")], policy, render_config)
     assert set(rule_ids(violations)) >= {"VARIANT_COUNT", "BANNED_PHRASE",
                                          "LITERAL_PHONE", "CTA_KEY_NOT_ALLOWED"}
 

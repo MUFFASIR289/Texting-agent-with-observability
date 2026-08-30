@@ -92,7 +92,7 @@ customer id. You do not have them, and inventing one is the failure this whole \
 design exists to prevent.
 - Email variants need a subject and a body. SMS variants need a body inside the \
 character limit given. Keep SMS short enough that the opt-out text still fits.
-- Give each variant a distinct label and make the variants meaningfully \
+- Make the variants meaningfully \
 different, so that comparing them tells us something. Two rewordings of the \
 same sentence are not an A/B test.
 - Every claim in the copy must hold for every customer in the segment, because \

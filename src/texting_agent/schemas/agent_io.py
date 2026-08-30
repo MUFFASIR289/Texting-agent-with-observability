@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from texting_agent.schemas.campaign import (
     Channel,
+    CtaUrlKey,
     OfferType,
     PlaybookId,
     SegmentPredicate,
@@ -95,11 +96,10 @@ class MessageVariant(BaseModel):
     """
 
     channel: Channel
-    label: str = Field(min_length=1, max_length=2)      # 'A' | 'B' | 'C'
     subject_template: str | None = None                 # email only
     body_template: str = Field(min_length=1)
     cta_text: str | None = None
-    cta_url_key: str | None = None      # a key into config, never a raw URL
+    cta_url_key: CtaUrlKey | None = None   # closed, so an invented key cannot be said
 
 
 class MessageVariantSet(BaseModel):
