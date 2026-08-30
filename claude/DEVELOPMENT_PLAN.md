@@ -348,10 +348,11 @@ approved; a policy-violating campaign rejected with a named rule.
 with per-recipient outcomes.
 
 **Definition of Done**
-- [ ] No dispatch occurs without an approval and a matching hash `[AC-14]`
-- [ ] Every recipient has a terminal status with a reason where applicable `[AC-6]`
-- [ ] A provider failure is `FAILED`, never `SENT` `[FR-52]`
-- [ ] Re-running a send produces no duplicates
+- [x] No dispatch occurs without an approval and a matching hash `[AC-14]`
+- [x] Every recipient has a terminal status with a reason where applicable `[AC-6]`
+- [x] A provider failure is `FAILED`, never `SENT` `[FR-52]`
+- [x] Re-running a send produces no duplicates
+- [x] Send-time gates only ever remove recipients from the frozen list `[RV-C3]`
 
 ---
 

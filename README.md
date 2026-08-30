@@ -124,5 +124,15 @@ offer and audience together, so nothing can change under an approval. The pipeli
 stops at `AWAITING_APPROVAL`; approve, reject, cancel and revise are role-gated and
 state-guarded.
 
-Next: **M8 (Communication & Sending)** — the send gates, mock providers and the
-send log.
+**M8 (Communication & Sending)** complete: the approved hash is re-verified over
+content and the frozen audience before anything is dispatched, and a mismatch aborts
+the whole send. Suppression, consent and a cross-campaign frequency cap are enforced
+at send time and can only remove recipients. Every attempt writes a `send_log` row
+with its outcome and reason. A dev-only event simulator closes the loop so analytics
+has something to measure.
+
+Verified end to end on the seeded 5,000-customer account: 4,844 targetable, 4,567
+sent, 277 skipped for consent, none failed.
+
+Next: **M9 (Analytics, A/B & Optimization)** — the rates, the two-proportion z-test
+and the OPTIMIZE stage.
