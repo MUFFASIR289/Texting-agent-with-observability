@@ -69,7 +69,7 @@ def seed_agent_db(path, account_id="ACC_A", count=30):
          (NOW - timedelta(days=150)).isoformat(),
          (NOW - timedelta(days=150)).isoformat(),
          (NOW - timedelta(days=400)).isoformat(),
-         8, 800.0, 20.0, 2, NOW.isoformat())
+         8, 800.0, 20.0, 2, 1, 1, NOW.isoformat())
         for i in range(count)
     ]
     with sqlite3.connect(path) as conn:
@@ -77,8 +77,9 @@ def seed_agent_db(path, account_id="ACC_A", count=30):
             "INSERT INTO customer_agent_records (account_id, customer_id, "
             "customer_name, email, phone, registration_date, last_activity_at, "
             "last_login_at, last_purchase_at, total_orders, total_spend, "
-            "purchase_frequency_days, support_issue_count_90d, data_as_of) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "purchase_frequency_days, support_issue_count_90d, "
+            "email_consent, sms_consent, data_as_of) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rows,
         )
 

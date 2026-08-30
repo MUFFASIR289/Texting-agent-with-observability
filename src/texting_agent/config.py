@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     # so the model is told the budget its own body has to fit inside.
     sms_max_characters: int = 140
 
+    # Non-zero exercises the retry and circuit-breaker paths in a demo.
+    provider_failure_rate: float = 0.0
+
     llm_timeout_seconds: float = 60.0
     llm_max_attempts: int = 3           # transient failures only
     token_budget_per_campaign: int = 60_000     # hard cap [NFR-04]

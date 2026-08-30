@@ -259,3 +259,42 @@ def test_no_key_material_reaches_the_logs(client, capsys):
     assert OPERATOR_SECRET not in combined
     assert APPROVER_SECRET not in combined
     assert "brute-force-attempt" not in combined
+
+
+def test_every_route_is_accounted_for():
+    """A route inventory, asserted rather than assumed.
+
+    `app.routes` does not enumerate included routers in this Starlette version,
+    so an earlier version of this check passed vacuously. The OpenAPI spec is
+    the one view that sees everything, which makes it the one worth asserting
+    on: a route added without a test lands here first.
+    """
+    paths = set(app.openapi()["paths"])
+    assert paths == {
+        "/health",
+        "/campaigns",
+        "/campaigns/{campaign_id}",
+        "/campaigns/{campaign_id}/segments",
+        "/campaigns/{campaign_id}/customers",
+        "/campaigns/{campaign_id}/messages",
+        "/campaigns/{campaign_id}/approve",
+        "/campaigns/{campaign_id}/reject",
+        "/campaigns/{campaign_id}/cancel",
+        "/campaigns/{campaign_id}/revise",
+        "/campaigns/{campaign_id}/send",
+        "/campaigns/{campaign_id}/sends",
+        "/campaigns/{campaign_id}/simulate-events",
+        "/agent/query",
+    }
+
+
+def test_no_route_but_health_is_public():
+    """Every path above except /health sits behind the global dependency."""
+    with TestClient(app) as unauthenticated:
+        for path in app.openapi()["paths"]:
+            if path == "/health":
+                continue
+            url = path.replace("{campaign_id}", "some-id")
+            for method in app.openapi()["paths"][path]:
+                response = getattr(unauthenticated, method)(url)
+                assert response.status_code == 401, (method, path)

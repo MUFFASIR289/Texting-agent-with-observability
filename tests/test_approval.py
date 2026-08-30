@@ -292,7 +292,10 @@ def test_the_pipeline_stops_at_awaiting_approval(campaign):
     assert campaign["state"] == "AWAITING_APPROVAL"
 
 
-def test_no_send_route_exists_yet():
-    """M8 adds it. Until then there is provably no code path to a customer."""
-    paths = {route.path for route in app.routes if hasattr(route, "path")}
-    assert "/campaigns/{campaign_id}/send" not in paths
+def test_sending_requires_an_approval(client, campaign):
+    """FR-41: the send route exists now, and refuses a campaign nobody approved.
+    That refusal is the only thing standing between a draft and a customer."""
+    response = client.post(f"/campaigns/{campaign['campaign_id']}/send",
+                           headers=ops())
+    assert response.status_code == 409
+    assert response.json()["error"]["details"][0]["current"] == "AWAITING_APPROVAL"

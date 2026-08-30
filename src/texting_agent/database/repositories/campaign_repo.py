@@ -121,6 +121,49 @@ _SQL: dict[str, str] = {
         "decided_at FROM campaign_approvals WHERE campaign_id = :campaign_id "
         "ORDER BY decided_at"
     ),
+    "insert_send": (
+        "INSERT OR IGNORE INTO send_log (send_id, campaign_id, segment_id, "
+        "variant_id, account_id, customer_id, channel, status, skip_reason, "
+        "provider_message_id, error, attempted_at) "
+        "VALUES (:send_id, :campaign_id, :segment_id, :variant_id, :account_id, "
+        ":customer_id, :channel, :status, :skip_reason, :provider_message_id, "
+        ":error, :attempted_at)"
+    ),
+    "list_sends": (
+        "SELECT send_id, campaign_id, segment_id, variant_id, account_id, "
+        "customer_id, channel, status, skip_reason, provider_message_id, error, "
+        "attempted_at FROM send_log WHERE campaign_id = :campaign_id "
+        "ORDER BY attempted_at, customer_id, channel"
+    ),
+    "count_recent_sends": (
+        "SELECT COUNT(*) AS n FROM send_log WHERE account_id = :account_id "
+        "AND customer_id = :customer_id AND status = 'SENT' "
+        "AND attempted_at >= :since"
+    ),
+    "is_suppressed": (
+        "SELECT 1 FROM suppressions WHERE account_id = :account_id "
+        "AND customer_id = :customer_id AND channel = :channel"
+    ),
+    "insert_suppression": (
+        "INSERT OR IGNORE INTO suppressions (account_id, customer_id, channel, "
+        "reason, created_at) VALUES (:account_id, :customer_id, :channel, "
+        ":reason, :created_at)"
+    ),
+    "insert_event": (
+        "INSERT INTO engagement_events (event_id, send_id, event_type, revenue, "
+        "occurred_at) VALUES (:event_id, :send_id, :event_type, :revenue, "
+        ":occurred_at)"
+    ),
+    "list_events": (
+        "SELECT e.event_id, e.send_id, e.event_type, e.revenue, e.occurred_at, "
+        "s.campaign_id, s.segment_id, s.variant_id, s.customer_id, s.channel "
+        "FROM engagement_events e JOIN send_log s ON s.send_id = e.send_id "
+        "WHERE s.campaign_id = :campaign_id ORDER BY e.occurred_at"
+    ),
+    "get_send": (
+        "SELECT send_id, campaign_id, account_id, customer_id, channel "
+        "FROM send_log WHERE send_id = :send_id"
+    ),
     "insert_run": (
         "INSERT INTO agent_runs (run_id, campaign_id, account_id, stage, model_id, "
         "tokens_in, tokens_out, latency_ms, status, error, trace_id, created_at) "
@@ -317,6 +360,96 @@ class CampaignRepository:
     def list_variants(self, campaign_id: str) -> list[sqlite3.Row]:
         return self._conn.execute(
             _SQL["list_variants"], {"campaign_id": campaign_id}
+        ).fetchall()
+
+    # --- sending ----------------------------------------------------------
+
+    def record_send(self, campaign_id: str, segment_id: str, account_id: str,
+                    customer_id: str, channel: str, status: str,
+                    variant_id: str | None = None, skip_reason: str | None = None,
+                    provider_message_id: str | None = None,
+                    error: str | None = None) -> str:
+        """One row per attempt, whatever the outcome `[FR-51]`.
+
+        INSERT OR IGNORE against UNIQUE(campaign, customer, channel), so a
+        replayed send is a no-op rather than a second message.
+        """
+        send_id = str(uuid.uuid4())
+        self._conn.execute(_SQL["insert_send"], {
+            "send_id": send_id, "campaign_id": campaign_id,
+            "segment_id": segment_id, "variant_id": variant_id,
+            "account_id": account_id, "customer_id": customer_id,
+            "channel": channel, "status": status, "skip_reason": skip_reason,
+            "provider_message_id": provider_message_id, "error": error,
+            "attempted_at": _now(),
+        })
+        self._conn.commit()
+        return send_id
+
+    def list_sends(self, campaign_id: str) -> list[sqlite3.Row]:
+        return self._conn.execute(
+            _SQL["list_sends"], {"campaign_id": campaign_id}
+        ).fetchall()
+
+    def get_send(self, send_id: str) -> sqlite3.Row | None:
+        return self._conn.execute(_SQL["get_send"], {"send_id": send_id}).fetchone()
+
+    def recent_send_count(self, account_id: str, customer_id: str,
+                          since: str) -> int:
+        """Across ALL campaigns `[FR-54]`. A per-campaign cap would let ten
+        campaigns each send politely and the customer receive ten messages."""
+        return int(self._conn.execute(_SQL["count_recent_sends"], {
+            "account_id": account_id, "customer_id": customer_id, "since": since,
+        }).fetchone()["n"])
+
+    # --- suppression ------------------------------------------------------
+
+    def is_suppressed(self, account_id: str, customer_id: str,
+                      channel: str) -> bool:
+        return self._conn.execute(_SQL["is_suppressed"], {
+            "account_id": account_id, "customer_id": customer_id,
+            "channel": channel,
+        }).fetchone() is not None
+
+    def suppress(self, account_id: str, customer_id: str, channel: str,
+                 reason: str) -> None:
+        self._conn.execute(_SQL["insert_suppression"], {
+            "account_id": account_id, "customer_id": customer_id,
+            "channel": channel, "reason": reason, "created_at": _now(),
+        })
+        self._conn.commit()
+
+    # --- engagement events ------------------------------------------------
+
+    def record_event(self, send_id: str, event_type: str,
+                     revenue: float | None = None,
+                     occurred_at: str | None = None) -> str:
+        """An unsubscribe or a bounce writes its suppression in the same
+        transaction as the event `[FR-40a]`.
+
+        Two statements would leave a window in which we know the customer
+        unsubscribed and would still send to them.
+        """
+        event_id = str(uuid.uuid4())
+        send = self.get_send(send_id)
+        with self._conn:
+            self._conn.execute(_SQL["insert_event"], {
+                "event_id": event_id, "send_id": send_id,
+                "event_type": event_type, "revenue": revenue,
+                "occurred_at": occurred_at or _now(),
+            })
+            if send is not None and event_type in ("UNSUBSCRIBED", "BOUNCED"):
+                self._conn.execute(_SQL["insert_suppression"], {
+                    "account_id": send["account_id"],
+                    "customer_id": send["customer_id"],
+                    "channel": send["channel"], "reason": event_type,
+                    "created_at": _now(),
+                })
+        return event_id
+
+    def list_events(self, campaign_id: str) -> list[sqlite3.Row]:
+        return self._conn.execute(
+            _SQL["list_events"], {"campaign_id": campaign_id}
         ).fetchall()
 
     # --- agent runs -------------------------------------------------------

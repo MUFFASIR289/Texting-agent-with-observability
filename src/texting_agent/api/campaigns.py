@@ -30,11 +30,20 @@ from texting_agent.deps import (
     require_operator,
 )
 from texting_agent.integrations.openai_client import OpenAILLMClient
+from texting_agent.integrations.providers import (
+    build_email_provider,
+    build_sms_provider,
+)
 from texting_agent.orchestrator.transitions import InvalidTransition, transition
 from texting_agent.orchestrator.workflow import CampaignWorkflow
 from texting_agent.schemas.campaign import CampaignState, Channel
 from texting_agent.schemas.churn import ValueTier
 from texting_agent.services import rendering_service, scoring_config
+from texting_agent.services.communication_service import (
+    CommunicationService,
+    HashMismatch,
+)
+from texting_agent.services.event_simulator import simulate
 from texting_agent.services.rendering_service import RenderContext
 from texting_agent.services.scoring_service import assess_account, days_since
 from texting_agent.services.value_service import assign_tiers
@@ -304,6 +313,76 @@ def _revision_feedback(repo: CampaignRepository, campaign,
         if decisions:
             return decisions[-1]["reason"] or "rejected without a stated reason"
     return campaign["failure_detail"] or "the previous attempt failed"
+
+
+@router.post("/campaigns/{campaign_id}/send")
+def send_campaign(campaign_id: str, context: Operator) -> dict:
+    """Dispatch an APPROVED campaign `[FR-63a]`, `[FR-45]`.
+
+    The hash is re-verified over stored content and the frozen audience before
+    anything is dispatched. A mismatch aborts the whole send: a partial send
+    under a changed approval is a send nobody authorised.
+    """
+    repo = campaign_repository()
+    campaign = _campaign_or_404(repo, context, campaign_id)
+    account_id = campaign["account_id"]
+    current = CampaignState(campaign["state"])
+    if current is not CampaignState.APPROVED:
+        raise APIError(409, "INVALID_STATE",
+                       "Only an approved campaign can be sent.",
+                       [{"current": current.value, "allowed": "APPROVED"}])
+
+    if not repo.try_transition(campaign_id, CampaignState.APPROVED,
+                               CampaignState.SENDING):
+        raise APIError(409, "INVALID_STATE", "This campaign is already sending.")
+
+    service = CommunicationService(
+        repo, customer_repository(),
+        email=build_email_provider(settings.provider_failure_rate),
+        sms=build_sms_provider(settings.provider_failure_rate),
+    )
+    try:
+        report = service.send(campaign_id, account_id, campaign["content_hash"] or "")
+    except HashMismatch as exc:
+        repo.record_failure(campaign_id, "HASH_MISMATCH", str(exc))
+        repo.try_transition(campaign_id, CampaignState.SENDING,
+                            CampaignState.FAILED)
+        raise APIError(409, "HASH_MISMATCH", str(exc)) from exc
+
+    repo.try_transition(campaign_id, CampaignState.SENDING, CampaignState.SENT)
+    return {"campaign_id": campaign_id, "state": CampaignState.SENT.value,
+            "sent": report.sent, "failed": report.failed,
+            "skipped": report.skipped, "skip_reasons": report.skip_reasons}
+
+
+@router.get("/campaigns/{campaign_id}/sends")
+def get_sends(campaign_id: str, context: Operator) -> dict:
+    """Per-recipient outcomes `[FR-51]`. Ids and status only, never PII."""
+    repo = campaign_repository()
+    _campaign_or_404(repo, context, campaign_id)
+    rows = repo.list_sends(campaign_id)
+    return {
+        "sends": [{"customer_id": r["customer_id"], "channel": r["channel"],
+                   "variant_id": r["variant_id"], "status": r["status"],
+                   "skip_reason": r["skip_reason"],
+                   "provider_message_id": r["provider_message_id"],
+                   "attempted_at": r["attempted_at"]} for r in rows],
+        "count": len(rows),
+    }
+
+
+@router.post("/campaigns/{campaign_id}/simulate-events")
+def simulate_events(campaign_id: str, context: Operator) -> dict:
+    """Dev only `[FR-63c]`, `[EC-30]`. 404 outside dev, as though the route did
+    not exist: a 403 would advertise that a way to fabricate engagement data is
+    one configuration flag away."""
+    if settings.env != "dev":
+        raise APIError(404, "NOT_FOUND", "No such endpoint.")
+    repo = campaign_repository()
+    _campaign_or_404(repo, context, campaign_id)
+    report = simulate(repo, campaign_id)
+    return {"campaign_id": campaign_id, "events": report.events,
+            "total_events": report.total, "revenue": report.revenue}
 
 
 @router.post("/agent/query", dependencies=[Depends(rate_limit)])
