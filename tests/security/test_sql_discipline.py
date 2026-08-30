@@ -12,11 +12,14 @@ import pytest
 
 SRC = Path(__file__).resolve().parents[2] / "src" / "texting_agent"
 
-# The only modules allowed to contain SQL text at all.
+# The only modules allowed to contain SQL text at all. Two repositories, one per
+# database: customer_repo is the agent-facing chokepoint `[SEC-04]`, campaign_repo
+# is the app-state one. Nothing else in src/ may contain a statement.
 SQL_MODULES = {
     Path("database/agent_db.py"),
     Path("database/app_db.py"),
     Path("database/repositories/customer_repo.py"),
+    Path("database/repositories/campaign_repo.py"),
 }
 
 # Each tuple is an AND: every part must appear. Single common words like "from"

@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
     goal                 TEXT,
     created_by           TEXT NOT NULL,
     created_at           TEXT NOT NULL,
+    updated_at           TEXT,
     content_hash         TEXT,            -- content + offer + frozen audience
     model_id             TEXT,
     prompt_version       TEXT,
