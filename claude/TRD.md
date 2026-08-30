@@ -837,7 +837,14 @@ def render(template: str, ctx: RenderContext) -> str:
 ```
 
 Fails closed, always. A message with a visible `{{first_name}}` is worse than a
-message not sent. Values are channel-escaped before substitution `[SEC-11]`.
+message not sent: the first costs trust, the second costs one recipient. Values are
+channel-escaped before substitution `[SEC-11]` — HTML-escaped for email, control
+characters stripped for SMS.
+
+The unsubscribe footer and the SMS opt-out are **appended by code**, not requested in
+the prompt, so a model having an off day cannot omit a legal requirement `[FR-32]`.
+CTAs are configuration keys rather than URLs, so a hostile link is not something the
+model can write `[VR-07]`.
 
 Because the model writes the template and code writes the values, fabricating a
 customer fact is not something the model can do wrong — it is something it cannot

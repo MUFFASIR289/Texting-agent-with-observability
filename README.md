@@ -110,5 +110,11 @@ Everything runs offline: the agent depends on a Protocol, so the test suite repl
 the model with a stub rather than patching a client library. The one live test costs
 money and is opt-in via `RUN_LIVE_SMOKE=1`.
 
-Next: **M6 (Strategy & Content)** — playbook selection, offers, channel choice and
-message templates.
+**M6 (Strategy & Content)** complete: PLAN and GENERATE run once per surviving
+segment, a placeholder allowlist in `config/placeholders.yaml`, and a renderer that
+fails closed — an unknown placeholder fails the campaign, an unresolvable one skips
+that customer with a recorded reason. `GET /campaigns/{id}/messages` previews each
+variant against a real targeted customer.
+
+Next: **M7 (Validation, Policy & Approval)** — offer caps, content safety, the frozen
+audience and the approval hash.

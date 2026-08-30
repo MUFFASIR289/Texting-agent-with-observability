@@ -277,7 +277,7 @@ returns grounded totals, patterns and cohorts.
 | 6.2 | Channel selection justified by segment engagement rates `[FR-24]` |
 | 6.3 | `GENERATE` stage → `MessageVariantSet`, ≥2 variants per channel `[FR-25]`, `[FR-33]` |
 | 6.4 | `config/placeholders.yaml` + allowlist enforcement `[FR-29]` |
-| 6.5 | `rendering_service.py` — fail-closed substitution, fallbacks, channel escaping `[FR-30]`, `[FR-31]`, `[SEC-11]` |
+| 6.5 | `rendering_service.py` — fail-closed substitution, fallbacks, channel escaping `[FR-30]`, `[FR-31]`, `[SEC-11]`. Two failure modes, deliberately different: an unknown placeholder fails the **campaign** (the template is wrong for everybody); an unresolvable one skips **one customer** with a reason |
 | 6.6 | Email structure (subject, body, CTA, unsubscribe footer) and SMS structure (body, opt-out) `[FR-32]` |
 | 6.7 | `GET /campaigns/{id}/messages` with rendered previews `[FR-34]` |
 | 6.8 | Tests: unknown placeholder raises; null without fallback skips; no raw placeholder ever ships |
@@ -286,11 +286,11 @@ returns grounded totals, patterns and cohorts.
 "Show me the messages".
 
 **Definition of Done**
-- [ ] Each segment carries a playbook, an offer, a justified channel decision and ≥2 variants `[AC-2]`
-- [ ] Generated content contains no literal name, email, phone or order id `[FR-25]`
-- [ ] Every preview renders with all placeholders resolved `[AC-3]`
-- [ ] Rendering fails closed in every unresolved case
-- [ ] Generated content contains no `customer_id` literal `[FR-25]`
+- [x] Each segment carries a playbook, an offer, a justified channel decision and ≥2 variants `[AC-2]`
+- [ ] Generated content contains no literal name, email, phone or order id `[FR-25]` — *the content-safety validator is M7 task 7.4; the schema and prompt forbid it, but nothing yet rejects it*
+- [x] Every preview renders with all placeholders resolved `[AC-3]`
+- [x] Rendering fails closed in every unresolved case
+- [ ] Generated content contains no `customer_id` literal `[FR-25]` — *same: M7 task 7.4*
 - [ ] **A human reads the generated copy and judges it sendable.** If it is not, that is a model-tier signal — raise `OPENAI_MODEL_GENERATE`, do not patch the prompt around it `[R15]`
 
 ---
