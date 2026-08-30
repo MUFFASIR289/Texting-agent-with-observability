@@ -25,7 +25,16 @@ from pydantic import BaseModel, Field
 from texting_agent.agent import instructions, prompts
 from texting_agent.agent.llm import LLMClient, StageResult, Usage
 from texting_agent.agent.tools import ScopedToolset
-from texting_agent.schemas.agent_io import AgentAnswer, ChurnAnalysis, SegmentationResult
+from texting_agent.schemas.agent_io import (
+    AgentAnswer,
+    ChurnAnalysis,
+    MessageVariantSet,
+    RetentionPlan,
+    SegmentationResult,
+)
+from texting_agent.schemas.campaign import SegmentPredicate
+from texting_agent.schemas.churn import ValueTier
+from texting_agent.services.playbook_service import PlaybookConfig
 
 log = structlog.get_logger()
 
@@ -94,6 +103,39 @@ class TextingAgent:
             instructions.SEGMENT,
             prompts.segment_prompt(analysis, summary, goal),
             SegmentationResult,
+        )
+
+    def plan(self, segment_name: str, hypothesis: str, size: int,
+             predicate: SegmentPredicate, dominant_tier: ValueTier,
+             playbooks: PlaybookConfig) -> StageResult[RetentionPlan]:
+        """One plan for one segment `[FR-23]`, `[FR-24]`.
+
+        The segment statistics come from the toolset rather than from the
+        caller, so the engagement rates the model must cite in its rationale are
+        the measured ones.
+        """
+        statistics = self._tools.get_segment_statistics(
+            predicate=predicate.model_dump(mode="json"))
+        return self._client.parse(
+            "plan",
+            instructions.PLAN,
+            prompts.plan_prompt(segment_name, hypothesis, size, statistics,
+                                playbooks, dominant_tier),
+            RetentionPlan,
+        )
+
+    def generate(self, plan: RetentionPlan, hypothesis: str,
+                 predicate: SegmentPredicate, placeholders: dict[str, str],
+                 sms_max_characters: int) -> StageResult[MessageVariantSet]:
+        """Templates for one segment `[FR-25]`, `[FR-33]`."""
+        statistics = self._tools.get_segment_statistics(
+            predicate=predicate.model_dump(mode="json"))
+        return self._client.parse(
+            "generate",
+            instructions.GENERATE,
+            prompts.generate_prompt(plan, statistics, hypothesis, placeholders,
+                                    sms_max_characters),
+            MessageVariantSet,
         )
 
     def query(self, question: str) -> QueryResult:

@@ -1,0 +1,54 @@
+# The only placeholders a template may contain `[FR-29]`, `[VR-08]`.
+#
+# Anything not listed here fails the campaign at validation. That is the point:
+# the model writes {{first_name}} and code supplies the value, so a fabricated
+# customer fact is not something the model can get wrong - it is something it
+# has no way to express.
+#
+# fallback: null means "no fallback". A customer whose value is missing is
+# skipped with a recorded reason rather than sent a message with a hole in it
+# `[FR-31]`.
+version: 1
+
+placeholders:
+  first_name:
+    source: customer_name
+    transform: first_token
+    fallback: "there"
+  value_tier:
+    source: value_tier
+    fallback: null
+  days_since_purchase:
+    source: days_since_purchase
+    fallback: null
+  last_purchase_category:
+    source: last_purchase_category
+    fallback: null
+  total_orders:
+    source: total_orders
+    fallback: null
+  offer_value:
+    source: offer.value
+    fallback: null
+  offer_code:
+    source: offer.code
+    fallback: null
+  brand_name:
+    source: account.brand_name
+    fallback: null
+  unsubscribe_url:
+    source: system.unsubscribe_url
+    fallback: null
+
+# Appended by code, never written by the model, so they cannot be omitted `[FR-32]`.
+footers:
+  EMAIL: "Unsubscribe: {{unsubscribe_url}}"
+  SMS: "Reply STOP to opt out."
+
+# CTA keys resolve to configured URLs. A template carries the key; a raw URL in
+# generated content is a validation failure `[VR-07]`.
+cta_urls:
+  shop_now: "https://example.test/shop"
+  view_offer: "https://example.test/offer"
+  account_home: "https://example.test/account"
+  support: "https://example.test/help"

@@ -9,7 +9,11 @@ from texting_agent.config import settings
 from texting_agent.database import app_db
 from texting_agent.deps import authenticate
 from texting_agent.observability.logging import configure_logging
-from texting_agent.services import playbook_service, scoring_config
+from texting_agent.services import (
+    playbook_service,
+    rendering_service,
+    scoring_config,
+)
 
 log = structlog.get_logger()
 
@@ -22,9 +26,11 @@ async def lifespan(app: FastAPI):
     # failed boot, not a bad campaign hours later.
     scoring = scoring_config.get()
     playbooks = playbook_service.get()
+    placeholders = rendering_service.get()
     log.info("service.start", env=settings.env, port=settings.port,
              scoring_config_version=scoring.version,
              playbook_count=len(playbooks.playbooks),
+             placeholder_count=len(placeholders.placeholders),
              api_keys_configured=len(settings.api_keys),
              llm_configured=bool(settings.openai_api_key))
     if not settings.openai_api_key:

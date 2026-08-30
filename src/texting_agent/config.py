@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     openai_model_optimize: str = ""
     openai_model_query: str = ""
 
+    # 160 rather than 160 minus the opt-out: the opt-out is appended by code,
+    # so the model is told the budget its own body has to fit inside.
+    sms_max_characters: int = 140
+
     llm_timeout_seconds: float = 60.0
     llm_max_attempts: int = 3           # transient failures only
     token_budget_per_campaign: int = 60_000     # hard cap [NFR-04]

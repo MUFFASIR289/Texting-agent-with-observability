@@ -18,11 +18,20 @@ from texting_agent.database import agent_db
 from texting_agent.main import app
 from texting_agent.schemas.agent_io import (
     ChurnAnalysis,
+    MessageVariant,
+    MessageVariantSet,
+    Offer,
     Pattern,
     ProposedSegment,
+    RetentionPlan,
     SegmentationResult,
 )
-from texting_agent.schemas.campaign import SegmentPredicate
+from texting_agent.schemas.campaign import (
+    Channel,
+    OfferType,
+    PlaybookId,
+    SegmentPredicate,
+)
 from texting_agent.schemas.churn import ReasonCode, RiskLevel
 from tests.stub_llm import StubLLMClient
 
@@ -109,6 +118,36 @@ def other() -> dict:
     return {"X-API-Key": OTHER_SECRET}
 
 
+def plan_for(segment_name: str) -> RetentionPlan:
+    return RetentionPlan(
+        segment_name=segment_name, playbook_id=PlaybookId.DORMANT,
+        offer=Offer(type=OfferType.PERCENTAGE_DISCOUNT, value=10, code="BACK10"),
+        channels=[Channel.EMAIL],
+        channel_rationale="email open rate 0.31 against no measured SMS response",
+    )
+
+
+def variants_for(segment_name: str) -> MessageVariantSet:
+    return MessageVariantSet(segment_name=segment_name, variants=[
+        MessageVariant(channel=Channel.EMAIL, label="A",
+                       subject_template="{{first_name}}, come back",
+                       body_template="We miss you. {{offer_value}}% off.",
+                       cta_text="Shop now", cta_url_key="shop_now"),
+        MessageVariant(channel=Channel.EMAIL, label="B",
+                       subject_template="A little something, {{first_name}}",
+                       body_template="Here is {{offer_value}}% off your next order.",
+                       cta_text="View offer", cta_url_key="view_offer"),
+    ])
+
+
+def full_run(*segment_names: str) -> list:
+    """ANALYZE, SEGMENT, then a PLAN and a GENERATE per surviving segment."""
+    queue = [ANALYSIS, SEGMENTS]
+    for name in segment_names:
+        queue += [plan_for(name), variants_for(name)]
+    return queue
+
+
 def script(stub, *outputs):
     stub.queue = list(outputs)
 
@@ -116,19 +155,25 @@ def script(stub, *outputs):
 # --- creating a campaign ---------------------------------------------------
 
 
-def test_a_campaign_runs_through_to_segmented(client, wired):
-    script(wired, ANALYSIS, SEGMENTS)
+def test_a_campaign_runs_through_to_content_ready(client, wired):
+    script(wired, *full_run("Critical lapsed", "Everyone else"))
     body = client.post("/campaigns", headers=ops(),
                        json={"account_id": "ACC_A", "goal": "win them back"}).json()
-    assert body["state"] == "SEGMENTED"
+    assert body["state"] == "CONTENT_READY"
     assert body["analysis"]["headline"] == "Buyers have gone quiet."
     assert sum(s["size"] for s in body["segments"]) == body["targetable_customers"]
-    assert body["tokens_used"] == 300
+    # Every fixture customer is CRITICAL, so the catch-all segment matches
+    # nobody and is dropped: one segment survives, hence four calls.
+    assert [s["name"] for s in body["segments"]] == ["Critical lapsed"]
+    assert body["dropped_segments"][0]["name"] == "Everyone else"
+    assert body["tokens_used"] == 600
+    assert body["variant_count"] == 2
+    assert body["plans"][0]["playbook_id"] == "DORMANT"
 
 
 def test_the_response_reports_what_was_excluded(client, wired):
     """FR-04c, FR-10a: counted on the campaign, not silently dropped."""
-    script(wired, ANALYSIS, SEGMENTS)
+    script(wired, *full_run("Critical lapsed", "Everyone else"))
     body = client.post("/campaigns", headers=ops(),
                        json={"account_id": "ACC_A", "goal": "g"}).json()
     assert set(body["excluded"]) == {"unknown_risk", "stale_data"}
@@ -142,7 +187,7 @@ def test_an_empty_segment_is_reported_as_dropped(client, wired):
                         hypothesis="none of these exist"),
         ProposedSegment(name="Everyone", priority=2,
                         predicate=SegmentPredicate(), hypothesis="catch-all"),
-    ]))
+    ]), plan_for("Everyone"), variants_for("Everyone"))
     body = client.post("/campaigns", headers=ops(),
                        json={"account_id": "ACC_A", "goal": "g"}).json()
     assert [d["name"] for d in body["dropped_segments"]] == ["VIP only"]
@@ -165,7 +210,7 @@ def test_no_llm_call_is_made_for_an_account_with_no_customers(client, wired,
 
 def test_the_campaign_records_the_key_that_created_it(client, wired):
     """AU-06."""
-    script(wired, ANALYSIS, SEGMENTS)
+    script(wired, *full_run("Critical lapsed", "Everyone else"))
     created = client.post("/campaigns", headers=ops(),
                           json={"account_id": "ACC_A", "goal": "g"}).json()
     fetched = client.get(f"/campaigns/{created['campaign_id']}", headers=ops()).json()
@@ -175,11 +220,13 @@ def test_the_campaign_records_the_key_that_created_it(client, wired):
 
 def test_agent_runs_are_persisted_by_the_orchestrator(client, wired):
     """SEC-09: the agent could not have written these itself."""
-    script(wired, ANALYSIS, SEGMENTS)
+    script(wired, *full_run("Critical lapsed", "Everyone else"))
     created = client.post("/campaigns", headers=ops(),
                           json={"account_id": "ACC_A", "goal": "g"}).json()
     runs = client.get(f"/campaigns/{created['campaign_id']}", headers=ops()).json()
-    assert [r["stage"] for r in runs["agent_runs"]] == ["analyze", "segment"]
+    assert [r["stage"] for r in runs["agent_runs"]] == [
+        "analyze", "segment", "plan", "generate",
+    ]
     assert all(r["status"] == "OK" for r in runs["agent_runs"])
 
 
@@ -202,7 +249,7 @@ def test_an_out_of_scope_account_is_403(client, wired):
 
 def test_another_tenants_campaign_is_404_not_403(client, wired):
     """AZ-05: 403 would confirm the id exists."""
-    script(wired, ANALYSIS, SEGMENTS)
+    script(wired, *full_run("Critical lapsed", "Everyone else"))
     created = client.post("/campaigns", headers=ops(),
                           json={"account_id": "ACC_A", "goal": "g"}).json()
     response = client.get(f"/campaigns/{created['campaign_id']}", headers=other())
@@ -213,7 +260,7 @@ def test_another_tenants_campaign_is_404_not_403(client, wired):
 def test_a_campaign_that_never_existed_looks_the_same(client, wired):
     invented = client.get("/campaigns/00000000-0000-0000-0000-000000000000",
                           headers=other())
-    script(wired, ANALYSIS, SEGMENTS)
+    script(wired, *full_run("Critical lapsed", "Everyone else"))
     created = client.post("/campaigns", headers=ops(),
                           json={"account_id": "ACC_A", "goal": "g"}).json()
     real_but_foreign = client.get(f"/campaigns/{created['campaign_id']}",
@@ -225,7 +272,7 @@ def test_a_campaign_that_never_existed_looks_the_same(client, wired):
 @pytest.mark.parametrize("path", ["", "/segments", "/customers"])
 def test_every_sub_resource_is_scope_checked(client, wired, path):
     """FR-64, FR-68: not one of them returns a filtered result instead."""
-    script(wired, ANALYSIS, SEGMENTS)
+    script(wired, *full_run("Critical lapsed", "Everyone else"))
     created = client.post("/campaigns", headers=ops(),
                           json={"account_id": "ACC_A", "goal": "g"}).json()
     url = f"/campaigns/{created['campaign_id']}{path}"
@@ -234,7 +281,7 @@ def test_every_sub_resource_is_scope_checked(client, wired, path):
 
 
 def test_listing_shows_only_the_callers_campaigns(client, wired):
-    script(wired, ANALYSIS, SEGMENTS)
+    script(wired, *full_run("Critical lapsed", "Everyone else"))
     client.post("/campaigns", headers=ops(), json={"account_id": "ACC_A", "goal": "g"})
     assert client.get("/campaigns", headers=ops()).json()["count"] == 1
     assert client.get("/campaigns", headers=other()).json()["count"] == 0
@@ -282,7 +329,7 @@ def test_agent_query_is_scope_checked(client, wired):
 
 def test_no_customer_pii_appears_in_any_response(client, wired):
     """RV-C8: ids and behaviour only."""
-    script(wired, ANALYSIS, SEGMENTS)
+    script(wired, *full_run("Critical lapsed", "Everyone else"))
     created = client.post("/campaigns", headers=ops(),
                           json={"account_id": "ACC_A", "goal": "g"})
     listed = client.get("/campaigns", headers=ops())
@@ -311,3 +358,66 @@ def test_the_deterministic_routes_work_without_a_model_key(client, wired, monkey
     monkeypatch.setattr(settings, "openai_api_key", "")
     assert client.get("/campaigns", headers=ops()).status_code == 200
     assert client.get("/health").status_code == 200
+
+
+# --- messages and previews -------------------------------------------------
+
+
+def test_messages_come_back_with_a_preview_rendered_for_a_real_customer(client, wired):
+    """FR-34: a preview against an invented customer would prove nothing."""
+    script(wired, *full_run("Critical lapsed"))
+    created = client.post("/campaigns", headers=ops(),
+                          json={"account_id": "ACC_A", "goal": "g"}).json()
+    body = client.get(f"/campaigns/{created['campaign_id']}/messages",
+                      headers=ops()).json()
+    assert body["count"] == 2
+    for variant in body["variants"]:
+        assert variant["preview"]["subject"]
+        assert "{{" not in variant["preview"]["body"]
+        assert variant["preview"]["cta_url"].startswith("https://")
+
+
+def test_a_preview_carries_the_unsubscribe_footer(client, wired):
+    """FR-32: appended by code, so the operator can see it is really there."""
+    script(wired, *full_run("Critical lapsed"))
+    created = client.post("/campaigns", headers=ops(),
+                          json={"account_id": "ACC_A", "goal": "g"}).json()
+    body = client.get(f"/campaigns/{created['campaign_id']}/messages",
+                      headers=ops()).json()
+    assert all("Unsubscribe:" in v["preview"]["body"] for v in body["variants"])
+
+
+def test_messages_are_scope_checked(client, wired):
+    script(wired, *full_run("Critical lapsed"))
+    created = client.post("/campaigns", headers=ops(),
+                          json={"account_id": "ACC_A", "goal": "g"}).json()
+    url = f"/campaigns/{created['campaign_id']}/messages"
+    assert client.get(url, headers=ops()).status_code == 200
+    assert client.get(url, headers=other()).status_code == 404
+
+
+def test_a_template_using_an_unknown_placeholder_fails_the_campaign(client, wired):
+    """VR-08, FR-38: failed with a reason, never silently rewritten to fit."""
+    bad = MessageVariantSet(segment_name="Critical lapsed", variants=[
+        MessageVariant(channel=Channel.EMAIL, label="A",
+                       subject_template="Hi", body_template="Your {{account_balance}}"),
+        MessageVariant(channel=Channel.EMAIL, label="B",
+                       subject_template="Hi", body_template="Come back"),
+    ])
+    script(wired, ANALYSIS, SEGMENTS, plan_for("Critical lapsed"), bad)
+    body = client.post("/campaigns", headers=ops(),
+                       json={"account_id": "ACC_A", "goal": "g"}).json()
+    assert body["failure"]["code"] == "INVALID_TEMPLATE"
+    assert "account_balance" in body["failure"]["detail"]
+    assert body["state"] == "FAILED"
+
+
+def test_no_preview_ever_contains_a_raw_placeholder(client, wired):
+    script(wired, *full_run("Critical lapsed"))
+    created = client.post("/campaigns", headers=ops(),
+                          json={"account_id": "ACC_A", "goal": "g"}).json()
+    response = client.get(f"/campaigns/{created['campaign_id']}/messages", headers=ops())
+    previews = [v["preview"]["body"] for v in response.json()["variants"]
+                if v["preview"]]
+    assert previews
+    assert all("{{" not in preview for preview in previews)

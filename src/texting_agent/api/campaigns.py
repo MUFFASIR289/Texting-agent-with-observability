@@ -7,6 +7,7 @@ details, because a distinguishable refusal confirms the id exists `[AZ-05]`.
 """
 
 import sqlite3
+from datetime import UTC, datetime
 from typing import Annotated
 
 import structlog
@@ -29,6 +30,12 @@ from texting_agent.deps import (
 )
 from texting_agent.integrations.openai_client import OpenAILLMClient
 from texting_agent.orchestrator.workflow import CampaignWorkflow
+from texting_agent.schemas.campaign import Channel
+from texting_agent.schemas.churn import ValueTier
+from texting_agent.services import rendering_service, scoring_config
+from texting_agent.services.rendering_service import RenderContext
+from texting_agent.services.scoring_service import assess_account, days_since
+from texting_agent.services.value_service import assign_tiers
 
 log = structlog.get_logger()
 
@@ -135,6 +142,49 @@ def get_customers(campaign_id: str, context: Operator) -> dict:
             "count": len(targets)}
 
 
+@router.get("/campaigns/{campaign_id}/messages")
+def get_messages(campaign_id: str, context: Operator) -> dict:
+    """Variants with a preview rendered against a real in-scope customer
+    `[FR-34]`.
+
+    A preview against an invented customer would prove nothing. The point is to
+    show the operator what an actual recipient receives - including the cases
+    where rendering refuses and that recipient is skipped, which is exactly what
+    they need to see before approving.
+    """
+    repo = campaign_repository()
+    campaign = _campaign_or_404(repo, context, campaign_id)
+    preview = _preview_context(repo, campaign_id, campaign["account_id"])
+
+    rendered = []
+    for row in repo.list_variants(campaign_id):
+        variant = _VariantRow(row)
+        entry = {
+            "variant_id": row["variant_id"],
+            "segment_name": row["segment_name"],
+            "channel": row["channel"],
+            "label": row["label"],
+            "subject_template": row["subject_template"],
+            "body_template": row["body_template"],
+            "preview": None,
+            "preview_unavailable": None,
+        }
+        if preview is None:
+            entry["preview_unavailable"] = "no targeted customer to render against"
+        else:
+            try:
+                message = rendering_service.render_variant(variant, preview)
+            except rendering_service.SkipCustomer as skip:
+                entry["preview_unavailable"] = skip.reason
+            else:
+                entry["preview"] = {
+                    "subject": message.subject, "body": message.body,
+                    "cta_text": message.cta_text, "cta_url": message.cta_url,
+                }
+        rendered.append(entry)
+    return {"variants": rendered, "count": len(rendered)}
+
+
 @router.post("/agent/query", dependencies=[Depends(rate_limit)])
 def agent_query(body: AgentQuery, context: Operator) -> dict:
     """A grounded answer plus the tools it rests on `[FR-65]`."""
@@ -151,6 +201,58 @@ def agent_query(body: AgentQuery, context: Operator) -> dict:
         "truncated": result.truncated,
         "tokens_used": result.usage.total_tokens,
     }
+
+
+class _VariantRow:
+    """Adapts a stored row to what the renderer expects, so the renderer does
+    not have to know about database rows."""
+
+    def __init__(self, row) -> None:
+        self.channel = Channel(row["channel"])
+        self.label = row["label"]
+        self.subject_template = row["subject_template"]
+        self.body_template = row["body_template"]
+        self.cta_text = row["cta_text"]
+        self.cta_url_key = row["cta_url_key"]
+
+
+def _preview_context(repo: CampaignRepository, campaign_id: str,
+                     account_id: str) -> RenderContext | None:
+    """Build a render context from a real targeted customer.
+
+    Before M7 freezes the audience there are no targets, so previews fall back
+    to the highest-risk customer in the account - still a real one, never an
+    invented one.
+    """
+    targets = repo.list_targets(campaign_id)
+    customers = CustomerRepository(agent_db.connect(settings.agent_db_path))
+    if targets:
+        record = customers.get(account_id, targets[0]["customer_id"])
+    else:
+        config = scoring_config.get()
+        assessment = assess_account(account_id,
+                                    customers.list_for_account(account_id), config)
+        targetable = [entry for entry in assessment.assessed if entry.targetable]
+        record = (customers.get(account_id, targetable[0].customer_id)
+                  if targetable else None)
+    if record is None:
+        return None
+
+    tiers, _ = assign_tiers(customers.list_for_account(account_id),
+                            scoring_config.get())
+    return RenderContext(
+        customer=record,
+        value_tier=tiers.get(record.customer_id, ValueTier.STANDARD),
+        days_since_purchase=_whole_days(days_since(record.last_purchase_at,
+                                                   datetime.now(UTC))),
+        offer={"value": 10, "code": "PREVIEW"},
+        brand_name=account_id,
+        unsubscribe_url=f"https://example.test/u/{record.customer_id}",
+    )
+
+
+def _whole_days(value: float | None) -> int | None:
+    return None if value is None else int(value)
 
 
 def _serialise(result) -> dict:
@@ -173,6 +275,14 @@ def _serialise(result) -> dict:
             {"name": name, "reason": reason}
             for name, reason in (result.segments.dropped if result.segments else [])
         ],
+        "plans": [
+            {"segment_name": p.segment_name, "playbook_id": p.playbook_id.value,
+             "offer": p.offer.model_dump(mode="json"),
+             "channels": [c.value for c in p.channels],
+             "channel_rationale": p.channel_rationale}
+            for p in result.plans
+        ],
+        "variant_count": result.variant_count,
         "tokens_used": result.tokens_used,
         "failure": ({"code": result.failure_code, "detail": result.failure_detail}
                     if result.failure_code else None),

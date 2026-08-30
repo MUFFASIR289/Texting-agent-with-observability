@@ -7,7 +7,12 @@ a closed enum is a vocabulary it cannot extend.
 
 from pydantic import BaseModel, Field
 
-from texting_agent.schemas.campaign import SegmentPredicate
+from texting_agent.schemas.campaign import (
+    Channel,
+    OfferType,
+    PlaybookId,
+    SegmentPredicate,
+)
 from texting_agent.schemas.churn import ReasonCode
 
 
@@ -48,3 +53,58 @@ class AgentAnswer(BaseModel):
     grounded_in: list[str] = Field(
         default=[], description="The tools whose output this answer rests on."
     )
+
+
+class Offer(BaseModel):
+    """What the customer is offered. `value` means whatever the type implies -
+    a percentage, an amount, a number of points - and policy caps it per tier
+    in M7. `NONE` is a real choice, not a missing one."""
+
+    type: OfferType
+    value: float = Field(default=0, ge=0)
+    code: str | None = Field(default=None, max_length=32)
+
+
+class RetentionPlan(BaseModel):
+    """PLAN, one per surviving segment.
+
+    `message_count` and `followup_days` are deliberately absent `[FR-23a]`: v1
+    sends one message per selected channel and has no scheduler, so a follow-up
+    cadence could never fire. A field the system cannot honour is worse than no
+    field, because it promises a capability to whoever reads the plan.
+    """
+
+    segment_name: str
+    playbook_id: PlaybookId               # closed enum, checked against config
+    offer: Offer
+    channels: list[Channel] = Field(min_length=1, max_length=2)
+    channel_rationale: str = Field(min_length=1)   # must cite engagement [FR-24]
+    variants_per_channel: int = Field(default=2, ge=2, le=3)
+
+
+class RetentionPlanSet(BaseModel):
+    plans: list[RetentionPlan] = Field(min_length=1, max_length=6)
+
+
+class MessageVariant(BaseModel):
+    """A template, never a message `[FR-25]`.
+
+    The model writes `{{first_name}}`; code substitutes the value. Fabricating a
+    customer fact is therefore not something the model can do wrong - it is
+    something it cannot express `[R1]`.
+    """
+
+    channel: Channel
+    label: str = Field(min_length=1, max_length=2)      # 'A' | 'B' | 'C'
+    subject_template: str | None = None                 # email only
+    body_template: str = Field(min_length=1)
+    cta_text: str | None = None
+    cta_url_key: str | None = None      # a key into config, never a raw URL
+
+
+class MessageVariantSet(BaseModel):
+    """GENERATE, one call per segment. At least two variants per channel so
+    there is something to A/B test `[FR-33]`."""
+
+    segment_name: str
+    variants: list[MessageVariant] = Field(min_length=2, max_length=6)

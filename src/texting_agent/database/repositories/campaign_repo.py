@@ -5,9 +5,8 @@ every value bound as a parameter, and `account_id` required on every read so a
 campaign belonging to someone else cannot be fetched even by id `[SEC-04]`,
 `[AZ-05]`.
 
-Variants, sends and engagement events land with the milestones that create them
-(M6 and M8). Writing their API now would mean guessing at callers that do not
-exist yet.
+Sends and engagement events land with M8, where their callers appear. Writing
+their API before that would mean guessing at signatures nothing calls yet.
 """
 
 import json
@@ -87,6 +86,26 @@ _SQL: dict[str, str] = {
     ),
     "count_targets": (
         "SELECT COUNT(*) AS n FROM campaign_targets WHERE campaign_id = :campaign_id"
+    ),
+    "insert_variant": (
+        "INSERT INTO message_variants (variant_id, segment_id, channel, label, "
+        "subject_template, body_template, cta_text, cta_url_key) "
+        "VALUES (:variant_id, :segment_id, :channel, :label, :subject_template, "
+        ":body_template, :cta_text, :cta_url_key)"
+    ),
+    "list_variants": (
+        "SELECT v.variant_id, v.segment_id, v.channel, v.label, "
+        "v.subject_template, v.body_template, v.cta_text, v.cta_url_key, "
+        "s.name AS segment_name "
+        "FROM message_variants v "
+        "JOIN campaign_segments s ON s.segment_id = v.segment_id "
+        "WHERE s.campaign_id = :campaign_id "
+        "ORDER BY s.priority, v.channel, v.label"
+    ),
+    "update_segment_plan": (
+        "UPDATE campaign_segments SET playbook_id = :playbook_id, "
+        "offer_json = :offer_json, channels = :channels, rationale = :rationale "
+        "WHERE segment_id = :segment_id"
     ),
     "insert_run": (
         "INSERT INTO agent_runs (run_id, campaign_id, account_id, stage, model_id, "
@@ -228,6 +247,36 @@ class CampaignRepository:
         return int(self._conn.execute(
             _SQL["count_targets"], {"campaign_id": campaign_id}
         ).fetchone()["n"])
+
+    def set_plan(self, segment_id: str, playbook_id: str, offer: dict,
+                 channels: list[str], rationale: str) -> None:
+        self._conn.execute(_SQL["update_segment_plan"], {
+            "segment_id": segment_id, "playbook_id": playbook_id,
+            "offer_json": json.dumps(offer), "channels": ",".join(channels),
+            "rationale": rationale,
+        })
+        self._conn.commit()
+
+    # --- message variants -------------------------------------------------
+
+    def add_variant(self, segment_id: str, channel: str, label: str,
+                    body_template: str, subject_template: str | None = None,
+                    cta_text: str | None = None,
+                    cta_url_key: str | None = None) -> str:
+        variant_id = str(uuid.uuid4())
+        self._conn.execute(_SQL["insert_variant"], {
+            "variant_id": variant_id, "segment_id": segment_id, "channel": channel,
+            "label": label, "subject_template": subject_template,
+            "body_template": body_template, "cta_text": cta_text,
+            "cta_url_key": cta_url_key,
+        })
+        self._conn.commit()
+        return variant_id
+
+    def list_variants(self, campaign_id: str) -> list[sqlite3.Row]:
+        return self._conn.execute(
+            _SQL["list_variants"], {"campaign_id": campaign_id}
+        ).fetchall()
 
     # --- agent runs -------------------------------------------------------
 

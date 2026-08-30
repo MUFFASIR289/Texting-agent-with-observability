@@ -12,8 +12,10 @@ capped sample, so a 100k-customer account costs the same as a 5k one `[EC-19]`,
 import json
 from typing import Any
 
-from texting_agent.agent.tools import CandidateList, ChurnSummary
-from texting_agent.schemas.agent_io import ChurnAnalysis
+from texting_agent.agent.tools import CandidateList, ChurnSummary, SegmentStatistics
+from texting_agent.schemas.agent_io import ChurnAnalysis, RetentionPlan
+from texting_agent.schemas.churn import ValueTier
+from texting_agent.services.playbook_service import PlaybookConfig
 
 
 def _json(value: Any) -> str:
@@ -69,3 +71,57 @@ def query_prompt(question: str) -> str:
         f"{question}\n"
         "QUESTION>>>"
     )
+
+
+def plan_prompt(segment_name: str, hypothesis: str, size: int,
+                statistics: SegmentStatistics, playbooks: PlaybookConfig,
+                dominant_tier: ValueTier) -> str:
+    """The playbooks offered are only those that apply to the segment's dominant
+    tier, so an unusable choice is not on the menu in the first place."""
+    available = playbooks.for_tier(dominant_tier)
+    menu = {
+        playbook_id.value: {
+            "allowed_offer_types": [o.value for o in
+                                    playbooks.playbooks[playbook_id].allowed_offer_types],
+            "tone": playbooks.playbooks[playbook_id].tone,
+            "guidance": playbooks.playbooks[playbook_id].guidance,
+        }
+        for playbook_id in available
+    }
+    return "\n".join([
+        f"Segment: {segment_name} ({size} customers)",
+        f"Your hypothesis about them: {hypothesis}",
+        "",
+        "Measured behaviour for this segment:",
+        _json(statistics.model_dump(mode="json")),
+        "",
+        "Playbooks available for these customers:",
+        _json(menu),
+        "",
+        "Choose the playbook, the offer and the channels.",
+    ])
+
+
+def generate_prompt(plan: RetentionPlan, statistics: SegmentStatistics,
+                    hypothesis: str, placeholders: dict[str, str],
+                    sms_max_characters: int) -> str:
+    return "\n".join([
+        f"Segment: {plan.segment_name}",
+        f"Why they are leaving: {hypothesis}",
+        f"Playbook: {plan.playbook_id.value}",
+        f"Offer: {plan.offer.type.value}" +
+        (f" of {plan.offer.value:g}" if plan.offer.value else ""),
+        f"Channels: {', '.join(c.value for c in plan.channels)}",
+        f"Variants per channel: {plan.variants_per_channel}",
+        "",
+        "Measured behaviour for this segment:",
+        _json(statistics.model_dump(mode="json")),
+        "",
+        "Placeholders you may use, and what each resolves to:",
+        _json(placeholders),
+        "",
+        f"SMS bodies must be at most {sms_max_characters} characters including "
+        "the opt-out text that will be appended.",
+        "",
+        "Write the variants.",
+    ])
