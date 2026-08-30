@@ -1,0 +1,12 @@
+/* Shared shell for every narrative section below the hero. */
+.section { position: relative; padding: var(--s-32) var(--s-6); }
+.inner { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; }
+/* --l-white, not --l-glow: in a .lit section this line sits in the brightest
+   band of the gradient, where glow-on-lift is two mid greens at 2.13:1. */
+.eyebrow { color: var(--l-white); display: block; margin-bottom: var(--s-4); }
+.title { margin-bottom: var(--s-8); max-width: 22ch; }
+.intro { max-width: 56ch; opacity: .82; margin-bottom: var(--s-12); }
+
+@media (max-width: 720px) {
+  .section { padding: var(--s-24) var(--s-4); }
+}

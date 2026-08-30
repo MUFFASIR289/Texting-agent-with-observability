@@ -1,0 +1,8 @@
+.footer {
+  display: flex; flex-wrap: wrap; gap: var(--s-4);
+  align-items: center; justify-content: space-between;
+  padding: var(--s-8) var(--s-6);
+  border-top: 1px solid hsl(var(--hue) 40% 44% / .18);
+  opacity: .7;
+}
+.links { display: flex; gap: var(--s-6); }

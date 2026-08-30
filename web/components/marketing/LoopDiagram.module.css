@@ -1,0 +1,66 @@
+/* A vertical spine rather than a ring: twelve labelled stages stay legible at
+   360px, which a twelve-node circle does not (U2's done-when). */
+
+.spine { position: relative; margin-top: var(--s-8); }
+
+/* The line the nodes sit on. */
+.spine::before {
+  content: ""; position: absolute; left: 11px; top: 8px; bottom: 8px;
+  width: 1px;
+  background: linear-gradient(to bottom,
+    transparent, hsl(var(--hue) 40% 44% / .5) 8%, hsl(var(--hue) 40% 44% / .5) 92%, transparent);
+}
+
+.stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: var(--s-6);
+  padding: var(--s-4) 0;
+  align-items: start;
+}
+
+.dot {
+  position: relative; z-index: 1;
+  width: 9px; height: 9px; margin: .55rem 0 0 7px;
+  border-radius: 50%;
+  background: var(--l-base);
+  box-shadow: 0 0 0 1px hsl(var(--hue) 40% 44% / .6);
+  transition: background 400ms ease-out, box-shadow 400ms ease-out;
+}
+
+/* Lights as the stage enters the viewport — the loop, running. */
+.stage[data-shown="true"] .dot {
+  background: var(--l-glow);
+  box-shadow: 0 0 0 1px var(--l-glow), 0 0 14px 2px hsl(var(--hue) 55% 72% / .5);
+}
+
+.head { display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; }
+.n { color: var(--l-glow); opacity: .7; }
+.name { font-size: 1.25rem; font-weight: 400; line-height: 1.2; }
+
+/* A7 — the state is a label, never a colour alone. */
+.state {
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: .6875rem;
+  padding: 2px var(--s-2);
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--hue) 40% 44% / .35);
+  color: var(--l-glow);
+  white-space: nowrap;
+}
+
+.note { opacity: .74; margin-top: var(--s-1); max-width: 62ch; }
+
+/* The close: stage 12 feeds stage 1. */
+.close {
+  display: grid; grid-template-columns: 24px 1fr; gap: var(--s-6);
+  padding-top: var(--s-4);
+  color: var(--l-glow);
+}
+.closeMark { text-align: center; opacity: .7; }
+
+@media (max-width: 720px) {
+  .stage { gap: var(--s-4); }
+  .name { font-size: 1.125rem; }
+}

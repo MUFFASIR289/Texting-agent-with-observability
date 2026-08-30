@@ -1,0 +1,32 @@
+/* Sticky with a translucent ground and blur. The pill is the single loud
+   element on the page (R2) — the only place --l-white becomes a surface. */
+.nav {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: var(--s-6);
+  padding: var(--s-4) var(--s-6);
+  background: hsl(var(--hue) 38% 9% / .72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid hsl(var(--hue) 40% 44% / .18);
+}
+
+.wordmark { font-weight: 500; letter-spacing: -.01em; white-space: nowrap; }
+.wordmark span { color: var(--l-glow); }
+
+.links { display: flex; gap: var(--s-6); margin: 0 auto; }
+.links a { color: var(--l-white); opacity: .78; transition: opacity 150ms; }
+.links a:hover { opacity: 1; }
+
+.cta {
+  background: var(--l-white); color: var(--l-deep);
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--radius-pill);
+  font-weight: 500; white-space: nowrap;
+  transition: transform 150ms;
+}
+.cta:hover { transform: translateY(-1px); }
+
+@media (max-width: 720px) {
+  .links { display: none; }
+  .cta { margin-left: auto; }
+}

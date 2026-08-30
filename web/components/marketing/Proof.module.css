@@ -1,0 +1,51 @@
+/* A dark device frame (§8). The console is U4+, so what sits in the frame is
+   the service's actual output rather than a mock of a screen that does not
+   exist yet. */
+
+.frame {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-0);
+  overflow: hidden;
+  box-shadow: 0 40px 80px -40px hsl(var(--hue) 30% 4% / .9);
+}
+
+.chrome {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+}
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--border); }
+.chromeLabel { margin-left: var(--s-3); opacity: .7; }
+
+.body { padding: var(--s-6); display: grid; gap: var(--s-6); }
+
+.call { display: grid; gap: var(--s-3); }
+
+.req {
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: .8125rem;
+  color: var(--l-glow);
+  word-break: break-all;
+}
+
+.res {
+  font-family: ui-monospace, "SF Mono", monospace;
+  white-space: pre-wrap;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--s-4);
+  overflow-x: auto;
+  margin: 0;
+}
+
+.caption { opacity: .7; }
+/* A7 — never colour alone: the word is the signal, the tint only reinforces it. */
+.good { color: var(--ok); }
+
+@media (max-width: 720px) {
+  .body { padding: var(--s-4); }
+  .res { font-size: .75rem; }
+}

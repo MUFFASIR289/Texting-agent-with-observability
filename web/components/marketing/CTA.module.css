@@ -1,0 +1,16 @@
+.cta { position: relative; padding: var(--s-48) var(--s-6); text-align: center; }
+.inner { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; }
+.title { margin-bottom: var(--s-8); }
+.lede { max-width: 46ch; margin: 0 auto var(--s-12); opacity: .82; }
+
+.button {
+  display: inline-block;
+  background: var(--l-white); color: var(--l-deep);
+  padding: var(--s-4) var(--s-8);
+  border-radius: var(--radius-pill);
+  font-weight: 500;
+  transition: transform 150ms;
+}
+.button:hover { transform: translateY(-2px); }
+
+.note { margin-top: var(--s-6); color: var(--l-white); opacity: .8; }

@@ -1,0 +1,46 @@
+/* Design tokens — UIUX.md §4. The single source of truth for both modes.
+   Change --hue and the entire system rebrands. */
+
+:root {
+  /* identity — change --hue to rebrand the entire system */
+  --hue: 152;                 /* green, matching the reference family */
+  --sat: 45%;
+
+  /* luminance ramp — this IS the palette */
+  --l-void:    hsl(var(--hue) 30% 4%);     /* vignette corners        */
+  --l-deep:    hsl(var(--hue) 38% 9%);     /* page ground             */
+  --l-base:    hsl(var(--hue) 42% 16%);    /* mid field               */
+  --l-mid:     hsl(var(--hue) 44% 28%);    /* lit field               */
+  --l-lift:    hsl(var(--hue) 40% 44%);    /* near the light source   */
+  --l-glow:    hsl(var(--hue) 55% 72%);    /* bloom                   */
+  --l-white:   hsl(var(--hue) 20% 98%);    /* type, highlights        */
+
+  /* console surfaces — flat, no atmosphere */
+  --surface-0: hsl(var(--hue) 20% 8%);
+  --surface-1: hsl(var(--hue) 16% 12%);
+  --surface-2: hsl(var(--hue) 14% 17%);
+  --border:    hsl(var(--hue) 14% 24%);
+
+  /* semantic — the ONLY places another hue is allowed */
+  --ok:    hsl(152 60% 55%);
+  --warn:  hsl(38  85% 60%);
+  --error: hsl(2   75% 62%);
+
+  /* type — --font is set by next/font in layout.tsx */
+  --font-jp: "Noto Sans JP", var(--font);
+
+  /* space — 4px base */
+  --s-1: .25rem; --s-2: .5rem;  --s-3: .75rem; --s-4: 1rem;
+  --s-6: 1.5rem; --s-8: 2rem;   --s-12: 3rem;  --s-16: 4rem;
+  --s-24: 6rem;  --s-32: 8rem;  --s-48: 12rem;
+
+  --radius: 6px;
+  --radius-pill: 999px;
+
+  /* type roles — §5. One family, two weights, extreme scale range. */
+  /* vw drives the scale; vh caps it, so three display lines plus the lede
+     still fit one screen on a short laptop viewport (§13). */
+  --t-display-size:    clamp(3rem, min(10.5vw, 15vh), 9.5rem);
+  --t-headline-size:   clamp(2rem, 4.5vw, 3.5rem);
+  --t-lede-size:       clamp(1.05rem, 1.6vw, 1.35rem);
+}

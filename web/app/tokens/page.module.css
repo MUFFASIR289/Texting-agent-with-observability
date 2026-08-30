@@ -1,0 +1,16 @@
+.page { padding: var(--s-12) var(--s-8); max-width: 1100px; margin: 0 auto; }
+.h { margin-bottom: var(--s-8); }
+.section { margin-bottom: var(--s-16); }
+.sectionTitle { color: var(--l-glow); margin-bottom: var(--s-4); }
+
+.ramp { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--s-2); }
+.swatch { padding: var(--s-4); border-radius: var(--radius); border: 1px solid var(--border); min-height: 96px; display: flex; flex-direction: column; justify-content: flex-end; }
+.swatchName { font-family: ui-monospace, monospace; }
+
+.roles > * + * { margin-top: var(--s-6); }
+.roleRow { border-bottom: 1px solid var(--border); padding-bottom: var(--s-4); }
+.roleMeta { color: var(--l-glow); margin-bottom: var(--s-2); }
+
+.scale { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: flex-end; }
+.step { background: var(--l-glow); border-radius: 2px; }
+.stepLabel { color: var(--l-glow); display: block; margin-top: var(--s-2); }

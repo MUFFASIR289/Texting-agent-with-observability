@@ -1,0 +1,13 @@
+/* Four stark statements at headline scale, not a feature grid (§8). */
+.list { display: grid; gap: var(--s-16); }
+
+.item { display: grid; grid-template-columns: auto 1fr; gap: var(--s-6); align-items: start; }
+.n { color: var(--l-glow); opacity: .6; padding-top: .7rem; }
+.claim { font-weight: 300; letter-spacing: -.02em; line-height: 1.1; }
+.because { opacity: .74; margin-top: var(--s-4); max-width: 58ch; }
+
+@media (max-width: 720px) {
+  .list { gap: var(--s-12); }
+  .item { grid-template-columns: 1fr; gap: var(--s-2); }
+  .n { padding-top: 0; }
+}

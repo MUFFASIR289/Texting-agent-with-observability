@@ -1,0 +1,19 @@
+.wrap { display: grid; place-items: center; width: 100%; height: 100%; }
+
+.svg { width: 100%; height: 100%; overflow: visible; }
+
+/* The ring turns slowly; the nodes counter-rotate so their glow stays put.
+   Only transform and opacity animate (§11). */
+.ring { animation: spin 48s linear infinite; transform-origin: 50% 50%; }
+
+.track { fill: none; stroke: var(--l-lift); stroke-opacity: .35; stroke-width: .6; }
+
+.node { fill: var(--l-glow); animation: pulse 9s ease-in-out infinite; }
+
+/* Bloom behind the ring — breathing, ±6% over 8s (§6). */
+.bloom { fill: var(--l-glow); filter: blur(14px); opacity: .28; animation: breathe 8s ease-in-out infinite; }
+
+@keyframes spin   { to { transform: rotate(360deg); } }
+@keyframes breathe{ 0%, 100% { opacity: .24; } 50% { opacity: .34; } }
+/* Each node lights as the sequence passes it — the loop, running. */
+@keyframes pulse  { 0%, 72%, 100% { opacity: .3; r: 1.6; } 8% { opacity: 1; r: 2.6; } }
