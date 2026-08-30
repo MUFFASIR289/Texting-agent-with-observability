@@ -1,6 +1,26 @@
 """Application settings. Fails fast at import if the environment is invalid."""
 
+from enum import StrEnum
+
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Role(StrEnum):
+    OPERATOR = "operator"
+    APPROVER = "approver"
+
+
+class ApiKey(BaseModel):
+    """One credential. Roles do not nest: an operator key cannot approve, and an
+    approver key cannot create campaigns `[AZ-04]`. Separation of duties is the
+    only reason to have two roles at all, and a hierarchy would dissolve it.
+    """
+
+    key_id: str = Field(min_length=1)      # logged; identifies who acted [AU-06]
+    secret: str = Field(min_length=8)      # never logged, traced or returned [AU-05]
+    role: Role
+    accounts: list[str] = Field(min_length=1)
 
 
 class Settings(BaseSettings):
@@ -17,6 +37,10 @@ class Settings(BaseSettings):
     # even if every other control fails.
     agent_db_path: str = "data/customer_agent.db"
     app_db_path: str = "data/app.db"
+
+    # JSON in the environment, never in the repo `[AU-03]`, `[SEC-08]`.
+    api_keys: list[ApiKey] = []
+    rate_limit_per_minute: int = 30     # per key, on the expensive routes [SEC-13]
 
     # Required from M5 onward. Empty is fine until then.
     openai_api_key: str = ""

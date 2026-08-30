@@ -987,6 +987,13 @@ than one tenant in reach `[RV-C1]`.
 through the API. Without it the loop breaks between "send the campaign" and "how did
 it perform", where a human would otherwise have to run a script `[RV-D3]`.
 
+Authentication is a global dependency over the whole app with a four-path public
+allowlist (`/health`, `/docs`, `/redoc`, `/openapi.json`), not a per-route decorator:
+a route added in a later milestone is protected without anyone remembering to say so,
+and the opt-in design fails silently in exactly the case that matters. Roles do not
+nest — an operator key cannot approve and an approver key cannot create — because
+separation of duties is the only reason to have two roles.
+
 Errors are uniform:
 
 ```json

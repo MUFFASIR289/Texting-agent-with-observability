@@ -92,5 +92,11 @@ at construction, four tools whose every parameter is an enum or a bounded intege
 that never carry a stack trace, a SQL string or a path. The PII test runs against the
 seeded database and fails rather than skips if it is missing.
 
-Next: **M4 (API & Auth)** — a secured HTTP surface over the deterministic
-intelligence, still with no LLM.
+**M4 (API & Auth)** partially complete: API-key authentication as a global
+dependency with constant-time comparison, an immutable per-request scope context,
+role gating, per-key rate limiting, and one error envelope carrying the same
+correlation id as the `X-Request-ID` header. The routes themselves land in M5,
+because every one of them needs a campaign or the agent to exist first.
+
+Next: **M5 (Agent Core & Orchestrator)** — the single agent, the state machine, and
+the endpoints that the M4 machinery protects.

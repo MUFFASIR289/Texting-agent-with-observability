@@ -201,25 +201,34 @@ LLM involved.
 
 **Goal.** A secured HTTP surface over the deterministic intelligence — still no LLM.
 
+> **Split during implementation.** Every route in the contract except `/health`
+> needs either a campaign (M5 persistence) or the agent (M5), so M4 delivers the
+> machinery and M5 wires the routes to it as they are created. Authentication is a
+> **global** dependency with a public allowlist rather than a per-route decorator,
+> so an M5 route is protected without opting in — the failure mode of the opt-in
+> design is a forgotten decorator, and it fails silently. Tasks 4.3, 4.5, 4.6, 4.8
+> and the route half of 4.9 move to M5.
+
 | # | Task |
 |---|---|
 | 4.1 | `deps.py` — API-key auth, constant-time compare, immutable `RequestContext` `[AU-01]`–`[AU-06]` |
 | 4.2 | Scope resolution and the `operator` / `approver` role gate `[AZ-01]`, `[AZ-04]` |
-| 4.3 | Campaign read endpoints backed by the repositories `[FR-64]` |
+| 4.3 | ~~Campaign read endpoints~~ — **moved to M5**, with the campaigns they read |
 | 4.4 | Uniform error envelope with `correlation_id` |
-| 4.5 | Out-of-scope resources return 404, never a filtered result `[AZ-05]`, `[FR-68]` |
-| 4.6 | `account_id` mandatory on `POST /campaigns` and `POST /agent/query`: 400 if absent, 403 if out of scope `[FR-63b]`, `[FR-66]` |
+| 4.5 | ~~Out-of-scope resources return 404~~ — **moved to M5**; `require_account` and the envelope exist, the routes that use them do not yet |
+| 4.6 | `require_account()`: 400 if absent, 403 if out of scope `[FR-63b]`, `[FR-66]` — applied to `POST /campaigns` and `POST /agent/query` in M5 |
 | 4.7 | Rate limiting on `/agent/query` and `/campaigns` `[SEC-13]` |
-| 4.8 | OpenAPI examples `[FR-69]` |
-| 4.9 | **Endpoint isolation tests** for every route, both accounts, both roles |
+| 4.8 | ~~OpenAPI examples~~ — **moved to M5**, with the endpoints to give examples of |
+| 4.9 | **Auth tests** against probe routes built from the real app factory: both roles, both accounts, absent/wrong key, rate limit, envelope. Per-route isolation tests land with the routes in M5 |
 
 **Deliverable.** Authenticated, scope-enforced API.
 
 **Definition of Done**
-- [ ] No endpoint except `/health` is reachable without a valid key `[AC-15]`
-- [ ] An `operator` key receives 403 on approve/reject
-- [ ] Cross-account access returns 404 on every route `[AC-12]`
-- [ ] Keys never appear in logs, traces or responses `[AU-05]`
+- [x] No endpoint except `/health` is reachable without a valid key, including routes added later `[AC-15]`
+- [x] An `operator` key receives 403 on approver routes, and an `approver` key 403 on operator routes
+- [ ] Cross-account access returns 404 on every route `[AC-12]` — *deferred to M5 with the routes*
+- [x] Keys never appear in logs, traces or responses `[AU-05]`
+- [x] Every error shares one envelope, and its `correlation_id` matches `X-Request-ID`
 
 ---
 
