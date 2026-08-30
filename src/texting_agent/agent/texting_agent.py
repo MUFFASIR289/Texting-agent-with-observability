@@ -17,12 +17,13 @@ What this class deliberately cannot do:
 """
 
 import json
+from dataclasses import dataclass, field
 
 import structlog
 from pydantic import BaseModel, Field
 
 from texting_agent.agent import instructions, prompts
-from texting_agent.agent.llm import LLMClient, StageResult
+from texting_agent.agent.llm import LLMClient, StageResult, Usage
 from texting_agent.agent.tools import ScopedToolset
 from texting_agent.schemas.agent_io import AgentAnswer, ChurnAnalysis, SegmentationResult
 
@@ -52,6 +53,22 @@ class _ToolStep(BaseModel):
         return parsed if isinstance(parsed, dict) else {}
 
 
+@dataclass
+class QueryResult:
+    """What the tool loop produced, and what the whole loop cost.
+
+    Usage is summed over every call, planning steps included: counting only the
+    final answer would under-report a six-iteration loop by most of its cost.
+    """
+
+    answer: str
+    grounded_in: list[str]
+    tools_called: list[str] = field(default_factory=list)
+    truncated: bool = False
+    usage: Usage = field(default_factory=Usage)
+    model: str = ""
+
+
 class TextingAgent:
     def __init__(self, client: LLMClient, toolset: ScopedToolset,
                  max_tool_iterations: int = 6) -> None:
@@ -79,17 +96,17 @@ class TextingAgent:
             SegmentationResult,
         )
 
-    def query(self, question: str) -> tuple[StageResult[AgentAnswer], list[str], bool]:
+    def query(self, question: str) -> QueryResult:
         """Answer an operator question, calling tools until it can `[FR-65]`.
 
-        Returns the answer, the tools actually called, and whether the iteration
-        cap was reached. The cap is what stops a model that keeps asking the same
+        The iteration cap is what stops a model that keeps asking the same
         question from spending the budget on it `[EC-18]`; hitting it truncates
         rather than fails, because a grounded partial answer beats an error.
         """
         called: list[str] = []
         observations: list[str] = []
         truncated = False
+        usage = Usage()
 
         for iteration in range(self._max_tool_iterations):
             plan = self._client.parse(
@@ -98,6 +115,8 @@ class TextingAgent:
                 prompts.query_prompt(question) + _observations_block(observations),
                 _ToolStep,
             )
+            usage.input_tokens += plan.usage.input_tokens
+            usage.output_tokens += plan.usage.output_tokens
             step = plan.output
             if step.tool is None:
                 break
@@ -119,7 +138,12 @@ class TextingAgent:
                if truncated else "\n\nAnswer the question now."),
             AgentAnswer,
         )
-        return answer, called, truncated
+        usage.input_tokens += answer.usage.input_tokens
+        usage.output_tokens += answer.usage.output_tokens
+        return QueryResult(answer=answer.output.answer,
+                           grounded_in=answer.output.grounded_in,
+                           tools_called=called, truncated=truncated,
+                           usage=usage, model=answer.model)
 
 
 def _tool_menu() -> str:

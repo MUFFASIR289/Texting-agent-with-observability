@@ -180,10 +180,12 @@ def test_query_calls_the_tools_it_asks_for_then_answers(toolset):
         AgentAnswer(answer="30 customers, all critical.",
                     grounded_in=["get_churn_summary"]),
     ])
-    answer, called, truncated = agent.query("How many are at risk?")
-    assert called == ["get_churn_summary"]
-    assert truncated is False
-    assert answer.output.answer.startswith("30 customers")
+    result = agent.query("How many are at risk?")
+    assert result.tools_called == ["get_churn_summary"]
+    assert result.truncated is False
+    assert result.answer.startswith("30 customers")
+    # every call in the loop counts, not only the final answer
+    assert result.usage.total_tokens == 450
 
 
 def test_tool_output_is_fed_back_into_the_next_prompt(toolset):
@@ -201,9 +203,9 @@ def test_the_loop_is_capped_and_truncates_rather_than_failing(toolset):
     spend the whole budget on it, but a grounded partial answer beats an error."""
     agent, stub = build(toolset, [step("get_churn_summary")] * 3
                         + [AgentAnswer(answer="partial")], max_iterations=3)
-    answer, called, truncated = agent.query("loop forever")
-    assert truncated is True
-    assert len(called) == 3
+    result = agent.query("loop forever")
+    assert result.truncated is True
+    assert len(result.tools_called) == 3
     assert "reached your tool limit" in stub.prompts[-1]
 
 
@@ -214,10 +216,10 @@ def test_a_tool_that_does_not_exist_is_an_observation_not_a_crash(toolset):
         step(None),
         AgentAnswer(answer="I cannot do that."),
     ])
-    answer, called, _ = agent.query("run some sql")
-    assert called == ["execute_sql"]
+    result = agent.query("run some sql")
+    assert result.tools_called == ["execute_sql"]
     assert "UNKNOWN_TOOL" in stub.prompts[1]
-    assert answer.output.answer == "I cannot do that."
+    assert result.answer == "I cannot do that."
 
 
 def test_malformed_tool_arguments_do_not_crash_the_loop(toolset):
@@ -226,8 +228,7 @@ def test_malformed_tool_arguments_do_not_crash_the_loop(toolset):
         step(None),
         AgentAnswer(answer="ok"),
     ])
-    _, called, _ = agent.query("give me candidates")
-    assert called == ["get_churn_candidates"]
+    assert agent.query("give me candidates").tools_called == ["get_churn_candidates"]
 
 
 def test_the_question_is_fenced_as_data(toolset):

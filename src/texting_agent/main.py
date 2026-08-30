@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import Depends, FastAPI, Request
 
-from texting_agent.api import errors, health
+from texting_agent.api import campaigns, errors, health
 from texting_agent.config import settings
 from texting_agent.database import app_db
 from texting_agent.deps import authenticate
@@ -25,7 +25,14 @@ async def lifespan(app: FastAPI):
     log.info("service.start", env=settings.env, port=settings.port,
              scoring_config_version=scoring.version,
              playbook_count=len(playbooks.playbooks),
-             api_keys_configured=len(settings.api_keys))
+             api_keys_configured=len(settings.api_keys),
+             llm_configured=bool(settings.openai_api_key))
+    if not settings.openai_api_key:
+        # Not fatal: everything deterministic still works, and the two routes
+        # that need a model say so plainly when called `[EH-11]`.
+        log.warning("service.llm_not_configured",
+                    detail="OPENAI_API_KEY is unset; /campaigns and /agent/query "
+                           "will return 503 until it is set")
     yield
     log.info("service.stop")
 
@@ -37,6 +44,7 @@ def create_app() -> FastAPI:
                   dependencies=[Depends(authenticate)])
     errors.register(app)
     app.include_router(health.router)
+    app.include_router(campaigns.router)
 
     @app.middleware("http")
     async def correlation_id(request: Request, call_next):

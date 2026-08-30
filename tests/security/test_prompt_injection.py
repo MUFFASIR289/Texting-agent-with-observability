@@ -61,9 +61,8 @@ def step(tool: str | None, **arguments) -> _ToolStep:
 def run(toolset, queue, question="anything"):
     stub = StubLLMClient(queue=list(queue))
     agent = TextingAgent(stub, toolset, max_tool_iterations=6)
-    answer, called, truncated = agent.query(question)
-    transcript = json.dumps(stub.prompts)
-    return answer, called, transcript
+    result = agent.query(question)
+    return result, result.tools_called, json.dumps(stub.prompts)
 
 
 # --- scope escape ----------------------------------------------------------
