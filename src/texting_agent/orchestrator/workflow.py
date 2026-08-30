@@ -247,7 +247,8 @@ class CampaignWorkflow:
             plan = self._stage(
                 campaign_id, account_id,
                 lambda s=segment, a=assigned, t=dominant_tier: agent.plan(
-                    s.name, s.hypothesis, a.size, s.predicate, t, playbooks),
+                    s.name, s.hypothesis, a.size, s.predicate, t, playbooks,
+                    policy.offers.max_discount_pct_by_tier[t]),
                 result,
             ).output
 

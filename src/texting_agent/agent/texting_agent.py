@@ -107,7 +107,8 @@ class TextingAgent:
 
     def plan(self, segment_name: str, hypothesis: str, size: int,
              predicate: SegmentPredicate, dominant_tier: ValueTier,
-             playbooks: PlaybookConfig) -> StageResult[RetentionPlan]:
+             playbooks: PlaybookConfig,
+             max_discount_pct: float) -> StageResult[RetentionPlan]:
         """One plan for one segment `[FR-23]`, `[FR-24]`.
 
         The segment statistics come from the toolset rather than from the
@@ -120,7 +121,7 @@ class TextingAgent:
             "plan",
             instructions.PLAN,
             prompts.plan_prompt(segment_name, hypothesis, size, statistics,
-                                playbooks, dominant_tier),
+                                playbooks, dominant_tier, max_discount_pct),
             RetentionPlan,
         )
 

@@ -18,11 +18,18 @@ from texting_agent.schemas.agent_io import (
     AgentAnswer,
     ChurnAnalysis,
     Pattern,
+    Offer,
     ProposedSegment,
+    RetentionPlan,
     SegmentationResult,
 )
-from texting_agent.schemas.campaign import SegmentPredicate
-from texting_agent.schemas.churn import ReasonCode, RiskLevel
+from texting_agent.schemas.campaign import (
+    Channel,
+    OfferType,
+    PlaybookId,
+    SegmentPredicate,
+)
+from texting_agent.schemas.churn import ReasonCode, RiskLevel, ValueTier
 from tests.stub_llm import StubLLMClient
 
 NOW = datetime(2026, 6, 1, tzinfo=UTC)
@@ -40,6 +47,13 @@ SEGMENTS = SegmentationResult(segments=[
                     predicate=SegmentPredicate(risk_levels=[RiskLevel.CRITICAL]),
                     hypothesis="They stopped buying."),
 ])
+
+
+PLAN = RetentionPlan(
+    segment_name="Lapsed buyers", playbook_id=PlaybookId.PRICE_SENSITIVE,
+    offer=Offer(type=OfferType.PERCENTAGE_DISCOUNT, value=10),
+    channels=[Channel.EMAIL], channel_rationale="email open rate 0.31",
+)
 
 
 @pytest.fixture(scope="module")
@@ -137,6 +151,19 @@ def test_segment_receives_the_analysis_and_the_goal(toolset):
     assert result.output is SEGMENTS
     assert "win back lapsed buyers" in stub.prompts[0]
     assert "Purchase gaps dominate." in stub.prompts[0]
+
+
+def test_the_plan_prompt_states_the_discount_cap(toolset):
+    """The cap is enforced either way [ADR-06], so withholding it from the model
+    only makes it guess. Stated for the segment's dominant tier, as the playbook
+    menu already is."""
+    from texting_agent.services import playbook_service
+
+    agent, stub = build(toolset, [PLAN])
+    agent.plan("Lapsed buyers", "They stopped buying.", 10,
+               SegmentPredicate(risk_levels=[RiskLevel.CRITICAL]),
+               ValueTier.LOW_VALUE, playbook_service.get(), max_discount_pct=10)
+    assert "Maximum percentage discount for these customers: 10%" in stub.prompts[0]
 
 
 def test_each_stage_uses_its_own_instructions(toolset):

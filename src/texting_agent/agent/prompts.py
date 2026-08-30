@@ -75,9 +75,11 @@ def query_prompt(question: str) -> str:
 
 def plan_prompt(segment_name: str, hypothesis: str, size: int,
                 statistics: SegmentStatistics, playbooks: PlaybookConfig,
-                dominant_tier: ValueTier) -> str:
+                dominant_tier: ValueTier, max_discount_pct: float) -> str:
     """The playbooks offered are only those that apply to the segment's dominant
-    tier, so an unusable choice is not on the menu in the first place."""
+    tier, so an unusable choice is not on the menu in the first place. The
+    discount cap is stated for the same reason: it is enforced either way
+    `[ADR-06]`, and a model that cannot see it can only guess."""
     available = playbooks.for_tier(dominant_tier)
     menu = {
         playbook_id.value: {
@@ -97,6 +99,8 @@ def plan_prompt(segment_name: str, hypothesis: str, size: int,
         "",
         "Playbooks available for these customers:",
         _json(menu),
+        "",
+        f"Maximum percentage discount for these customers: {max_discount_pct:g}%",
         "",
         "Choose the playbook, the offer and the channels.",
     ])
