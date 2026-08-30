@@ -24,7 +24,8 @@ curl http://127.0.0.1:8000/health
 Run the tests:
 
 ```bash
-uv run pytest
+uv run pytest                              # offline, no keys needed
+RUN_LIVE_SMOKE=1 uv run pytest tests/test_live_smoke.py   # opt-in, costs money
 ```
 
 ## Configuration
@@ -98,5 +99,16 @@ role gating, per-key rate limiting, and one error envelope carrying the same
 correlation id as the `X-Request-ID` header. The routes themselves land in M5,
 because every one of them needs a campaign or the agent to exist first.
 
-Next: **M5 (Agent Core & Orchestrator)** — the single agent, the state machine, and
-the endpoints that the M4 machinery protects.
+**M5 (Agent Core & Orchestrator)** complete: one `TextingAgent` class (asserted by
+an AST scan over the whole source tree), an LLM client with jittered retries on
+transient failures only, one schema re-ask, and a hard token budget checked before
+each call; the thirteen-state machine with conditional-UPDATE transitions; priority-
+ordered segment assignment; and the API routes that M4's machinery protects. The
+adversarial suite scripts a fully compromised model and asserts every escape fails.
+
+Everything runs offline: the agent depends on a Protocol, so the test suite replaces
+the model with a stub rather than patching a client library. The one live test costs
+money and is opt-in via `RUN_LIVE_SMOKE=1`.
+
+Next: **M6 (Strategy & Content)** — playbook selection, offers, channel choice and
+message templates.

@@ -741,6 +741,12 @@ POST /campaigns  { account_id, goal, ... }
   └─ return campaign
 ```
 
+`POST /campaigns` and `POST /agent/query` return **503 `LLM_NOT_CONFIGURED`**
+naming `OPENAI_API_KEY` when it is unset, rather than surfacing an SDK error as a
+500. Startup logs a warning instead of refusing to boot, so every deterministic
+route — health, scoring, campaign listing — still works without a model key
+`[EH-11]`.
+
 Only the five bracketed stages call the LLM. Everything else is ordinary code. The
 orchestrator — not the agent — writes every `agent_runs` row from the usage record
 each stage returns, which is what keeps `app/agent/**` free of any `app_db` import

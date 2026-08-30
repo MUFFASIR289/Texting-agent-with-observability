@@ -207,7 +207,7 @@ LLM involved.
 > **global** dependency with a public allowlist rather than a per-route decorator,
 > so an M5 route is protected without opting in — the failure mode of the opt-in
 > design is a forgotten decorator, and it fails silently. Tasks 4.3, 4.5, 4.6, 4.8
-> and the route half of 4.9 move to M5.
+> and the route half of 4.9 move to M5. **Done in M5.**
 
 | # | Task |
 |---|---|
@@ -226,7 +226,7 @@ LLM involved.
 **Definition of Done**
 - [x] No endpoint except `/health` is reachable without a valid key, including routes added later `[AC-15]`
 - [x] An `operator` key receives 403 on approver routes, and an `approver` key 403 on operator routes
-- [ ] Cross-account access returns 404 on every route `[AC-12]` — *deferred to M5 with the routes*
+- [x] Cross-account access returns 404 on every route `[AC-12]` — *done in M5 with the routes*
 - [x] Keys never appear in logs, traces or responses `[AU-05]`
 - [x] Every error shares one envelope, and its `correlation_id` matches `X-Request-ID`
 
@@ -248,21 +248,22 @@ drives it.
 | 5.7 | `states.py`, `transitions.py` — conditional-UPDATE guards `[EC-12]`, `[EH-09]` |
 | 5.8 | `workflow.py` — pipeline through `SEGMENTED` |
 | 5.9 | `/agent/query` tool loop with a hard iteration cap `[FR-65]`, `[EC-18]` |
-| 5.9a | `campaign_repo.py` — campaign/segment/target/variant/send/event persistence, written against the state machine that now exists (was M1 task 1.6) |
+| 5.9a | `campaign_repo.py` — campaign/segment/target/agent-run persistence, written against the state machine that now exists (was M1 task 1.6). Variants, sends and events land with M6 and M8, where their callers appear |
 | 5.10 | `agent_runs` persistence **written by the orchestrator** from the usage record each stage returns, keeping `app/agent/**` free of any app-DB import `[SEC-09]` |
 | 5.11 | LLM stub fixtures so the suite is deterministic and offline |
-| 5.11a | Live smoke test confirming `gpt-5-nano` honours the strict structured-output schemas against the pinned SDK version |
+| 5.11a | Live smoke test confirming `gpt-5-nano` honours the strict structured-output schemas against the pinned SDK version. Opt-in via `RUN_LIVE_SMOKE=1`, so the suite stays offline and free |
 | 5.12 | **Prompt-injection tests**: scope escape, "run SQL", "list tables", "ignore your instructions" `[SEC-15]` |
 
 **Deliverable.** *Demo checkpoint 1* — "Show me all customers likely to churn"
 returns grounded totals, patterns and cohorts.
 
 **Definition of Done**
-- [ ] Exactly one agent class in the codebase; no sub-agents `[FR-19]`
-- [ ] Every stage output parses into its schema; one retry on parse failure `[VR-04]`
-- [ ] Budget overrun fails the run with `BUDGET_EXCEEDED` `[EH-03]`
-- [ ] Injection prompts change no scope and reach no forbidden data `[AC-12]`
-- [ ] Empty-account and no-candidate paths short-circuit without an LLM call `[EC-01]`, `[EC-02]`
+- [x] Exactly one agent class in the codebase; no sub-agents `[FR-19]` — asserted by AST scan
+- [x] Every stage output parses into its schema; one retry on parse failure `[VR-04]`
+- [x] Budget overrun fails the run with `BUDGET_EXCEEDED` `[EH-03]`
+- [x] Injection prompts change no scope and reach no forbidden data `[AC-12]`
+- [x] Empty-account and no-candidate paths short-circuit without an LLM call `[EC-01]`, `[EC-02]`
+- [x] The M4 routes are wired and scope-checked; another tenant's campaign is 404 with a body identical to a campaign that never existed `[AZ-05]`
 
 ---
 
