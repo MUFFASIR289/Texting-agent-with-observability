@@ -1,0 +1,37 @@
+# Churn scoring, value tiering and freshness. Changing this file changes output
+# with no code change [FR-05]. Validated at import; an invalid file fails startup.
+version: 1
+
+weights:                          # must sum to 1.0
+  recency: 0.20                   # -> DORMANCY
+  purchase_gap: 0.20              # -> PURCHASE_GAP
+  engagement: 0.20                # -> ENGAGEMENT_DECLINE | LOW_ENGAGEMENT
+  purchase_decline: 0.15          # -> PURCHASE_DECLINE
+  login_lapse: 0.10               # -> LOGIN_LAPSE
+  cart_abandon: 0.10              # -> CART_ABANDONMENT
+  support: 0.05                   # -> SUPPORT_FRICTION
+
+normalisation:
+  inactivity_horizon_days: 90
+  expected_interval_floor_days: 7
+  baseline_email_open_rate: 0.25
+  baseline_sms_response_rate: 0.10
+  abandon_cap: 3                  # per 90 days
+  support_cap: 2                  # per 90 days
+
+thresholds:
+  critical: 0.80
+  high: 0.60
+  medium: 0.35
+
+reason_threshold: 0.60            # a signal at or above this becomes a reason code
+min_signals_required: 2
+
+value:
+  vip_pct: 0.05                   # top 5% of purchasers by spend
+  high_pct: 0.20                  # next 20%
+  standard_pct: 0.50              # next 50%; the remainder is LOW_VALUE
+  min_purchasers_for_tiering: 20
+
+data_quality:
+  freshness_window_days: 7        # data_as_of older than this is stale [FR-10]

@@ -1,0 +1,33 @@
+# Retention playbooks [FR-23]. The model picks a playbook id; it never invents one,
+# and the offer types it may propose are bounded by the entry it picked.
+version: 1
+playbooks:
+  VIP_REACTIVATION:
+    applies_to_tiers: [VIP, HIGH_VALUE]
+    allowed_offer_types: [LOYALTY_POINTS, EARLY_ACCESS, PERCENTAGE_DISCOUNT]
+    tone: premium, personal, appreciative
+    guidance: Acknowledge tenure and value. Lead with benefit, not discount.
+
+  PRICE_SENSITIVE:
+    applies_to_tiers: [STANDARD, LOW_VALUE]
+    allowed_offer_types: [PERCENTAGE_DISCOUNT, FIXED_DISCOUNT, FREE_SHIPPING]
+    tone: direct, value-focused
+    guidance: Lead with the saving and a clear deadline.
+
+  CART_ABANDONMENT:
+    applies_to_tiers: [VIP, HIGH_VALUE, STANDARD, LOW_VALUE]
+    allowed_offer_types: [FREE_SHIPPING, PERCENTAGE_DISCOUNT, NONE]
+    tone: helpful, low-pressure
+    guidance: Remind of the abandoned intent; incentive is secondary.
+
+  DORMANT:
+    applies_to_tiers: [VIP, HIGH_VALUE, STANDARD, LOW_VALUE]
+    allowed_offer_types: [PERCENTAGE_DISCOUNT, NONE]
+    tone: warm, uncomplicated
+    guidance: Re-introduce what changed; low friction, single CTA.
+
+  SUPPORT_RECOVERY:
+    applies_to_tiers: [VIP, HIGH_VALUE, STANDARD, LOW_VALUE]
+    allowed_offer_types: [NONE, FIXED_DISCOUNT]
+    tone: accountable, plain
+    guidance: Acknowledge the issue, offer resolution first, ask for feedback.
