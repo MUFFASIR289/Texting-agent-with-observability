@@ -23,7 +23,7 @@ API_KEY_HEADER = "X-API-Key"
 
 # Everything else requires a key. Documentation is public because it describes
 # the contract, not the data.
-PUBLIC_PATHS = frozenset({"/health", "/docs", "/redoc", "/openapi.json"})
+PUBLIC_PATHS = frozenset({"/", "/health", "/docs", "/redoc", "/openapi.json"})
 
 
 class APIError(Exception):

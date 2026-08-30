@@ -119,10 +119,10 @@ def test_the_real_app_carries_the_same_global_dependency():
         assert real.get("/health").status_code == 200
 
 
-def test_health_is_the_only_non_public_route_that_needs_no_key():
+def test_the_public_routes_are_exactly_these():
     """If a route is ever added to PUBLIC_PATHS, this test is where that shows
     up as a deliberate decision rather than a quiet one."""
-    assert deps.PUBLIC_PATHS == {"/health", "/docs", "/redoc", "/openapi.json"}
+    assert deps.PUBLIC_PATHS == {"/", "/health", "/docs", "/redoc", "/openapi.json"}
 
 
 def test_key_comparison_is_constant_time():
@@ -271,6 +271,7 @@ def test_every_route_is_accounted_for():
     """
     paths = set(app.openapi()["paths"])
     assert paths == {
+        "/",
         "/health",
         "/campaigns",
         "/campaigns/{campaign_id}",
@@ -288,11 +289,12 @@ def test_every_route_is_accounted_for():
     }
 
 
-def test_no_route_but_health_is_public():
-    """Every path above except /health sits behind the global dependency."""
+def test_every_non_public_route_requires_a_key():
+    """Every path above except the public ones sits behind the global
+    dependency."""
     with TestClient(app) as unauthenticated:
         for path in app.openapi()["paths"]:
-            if path == "/health":
+            if path in ("/", "/health"):
                 continue
             url = path.replace("{campaign_id}", "some-id")
             for method in app.openapi()["paths"][path]:

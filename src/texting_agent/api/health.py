@@ -1,6 +1,6 @@
 import sqlite3
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from texting_agent import __version__
 from texting_agent.config import settings
@@ -36,6 +36,25 @@ def _app_db_status() -> dict:
         return {"reachable": True, "writable": app_db.is_writable(conn)}
     finally:
         conn.close()
+
+
+@router.get("/")
+def index(request: Request) -> dict:
+    """An index, so the root path is an answer rather than a 404.
+
+    The endpoint list is derived from the OpenAPI schema rather than written
+    out here, so a route added later appears without anyone remembering to.
+    """
+    return {
+        "service": "texting-agent",
+        "version": __version__,
+        "docs": "/docs",
+        "endpoints": sorted(
+            f"{method.upper()} {path}"
+            for path, operations in request.app.openapi()["paths"].items()
+            for method in operations
+        ),
+    }
 
 
 @router.get("/health")
