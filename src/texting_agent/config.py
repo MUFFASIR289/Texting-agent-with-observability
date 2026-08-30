@@ -45,5 +45,28 @@ class Settings(BaseSettings):
     # Required from M5 onward. Empty is fine until then.
     openai_api_key: str = ""
 
+    # gpt-5-nano is the cheapest model on the current price list. Six per-stage
+    # overrides rather than one, so a quality problem on a single stage is one
+    # environment variable and not a blanket upgrade of all six.
+    openai_model_default: str = "gpt-5-nano"
+    openai_model_analyze: str = ""
+    openai_model_segment: str = ""
+    openai_model_plan: str = ""
+    openai_model_generate: str = ""
+    openai_model_optimize: str = ""
+    openai_model_query: str = ""
+
+    llm_timeout_seconds: float = 60.0
+    llm_max_attempts: int = 3           # transient failures only
+    token_budget_per_campaign: int = 60_000     # hard cap [NFR-04]
+    agent_max_tool_iterations: int = 6          # [EC-18]
+
+    @property
+    def stage_models(self) -> dict[str, str]:
+        return {
+            stage: getattr(self, f"openai_model_{stage}") or self.openai_model_default
+            for stage in ("analyze", "segment", "plan", "generate", "optimize", "query")
+        }
+
 
 settings = Settings()

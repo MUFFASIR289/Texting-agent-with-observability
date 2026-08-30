@@ -13,13 +13,19 @@ SRC = Path(__file__).resolve().parents[2] / "src" / "texting_agent"
 AGENT = SRC / "agent"
 
 # Writable state, delivery, and anything that would let the agent act on its own.
+# `agent/llm.py` defines a Protocol precisely so the agent can talk about a model
+# without importing one: the concrete client lives in integrations/ and is passed
+# in. That also keeps the whole suite offline.
 FORBIDDEN = (
     "texting_agent.database.app_db",
+    "texting_agent.integrations",   # incl. the OpenAI SDK and every provider
     "texting_agent.providers",
     "texting_agent.api",
     "sqlite3",
     "requests",
     "httpx",
+    "httpx2",
+    "openai",
 )
 
 AGENT_FILES = sorted(AGENT.rglob("*.py")) if AGENT.exists() else []
