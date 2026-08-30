@@ -19,9 +19,21 @@ SQL_MODULES = {
     Path("database/repositories/customer_repo.py"),
 }
 
-KEYWORDS = (
-    "select ", "insert ", "update ", "delete ", "drop ", "alter ", "create ",
-    "attach ", "pragma ", "replace into", " from ", " where ",
+# Each tuple is an AND: every part must appear. Single common words like "from"
+# are useless on their own - prompt text says "answer from what you have" - so a
+# statement has to look like SQL, not merely contain a word SQL also uses.
+PATTERNS = (
+    ("select ", " from "),
+    ("update ", " set "),
+    ("insert into",),
+    ("delete from",),
+    ("drop table",),
+    ("alter table",),
+    ("create table",),
+    ("create index",),
+    ("attach database",),
+    ("replace into",),
+    ("pragma ",),
 )
 
 PY_FILES = sorted(SRC.rglob("*.py"))
@@ -29,7 +41,7 @@ PY_FILES = sorted(SRC.rglob("*.py"))
 
 def _looks_like_sql(text: str) -> bool:
     lowered = text.lower()
-    return any(k in lowered for k in KEYWORDS)
+    return any(all(part in lowered for part in pattern) for pattern in PATTERNS)
 
 
 def _docstring_nodes(tree: ast.AST) -> set[int]:
