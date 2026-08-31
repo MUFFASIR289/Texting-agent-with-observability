@@ -1,0 +1,15 @@
+.title { font-weight: 600; margin-bottom: var(--s-2); }
+.sub { opacity: .72; margin-bottom: var(--s-6); max-width: 62ch; }
+.form { display: grid; gap: var(--s-3); margin-bottom: var(--s-8); max-width: 760px; }
+.row { display: flex; gap: var(--s-3); flex-wrap: wrap; }
+.input, .textarea {
+  padding: var(--s-3); background: var(--surface-0); color: var(--l-white);
+  border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: .875rem;
+}
+.input { width: 160px; font-family: ui-monospace, monospace; }
+.textarea { flex: 1; min-width: 260px; resize: vertical; }
+.answer { font-size: 1.0625rem; line-height: 1.6; white-space: pre-wrap; margin-bottom: var(--s-6); }
+.meta { display: flex; gap: var(--s-2); flex-wrap: wrap; align-items: center; }
+.metaK { opacity: .68; margin-right: var(--s-2); }
+.asked { opacity: .72; margin-bottom: var(--s-4); }
+.slow { opacity: .62; margin-top: var(--s-3); }

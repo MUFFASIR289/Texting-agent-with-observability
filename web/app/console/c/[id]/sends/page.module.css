@@ -1,0 +1,9 @@
+.head { margin-bottom: var(--s-6); }
+.title { font-weight: 600; margin-bottom: var(--s-2); }
+.sub { opacity: .72; }
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--s-4); margin-bottom: var(--s-6); }
+.tile { padding: var(--s-4); background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); display: grid; gap: var(--s-1); }
+.tileN { font-size: 1.375rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tileK { opacity: .68; }
+.note { opacity: .68; margin-top: var(--s-4); }
+.pii { margin-bottom: var(--s-6); }

@@ -1,0 +1,11 @@
+.title { font-weight: 600; margin-bottom: var(--s-2); }
+.sub { opacity: .72; margin-bottom: var(--s-6); max-width: 62ch; }
+.form { display: grid; gap: var(--s-4); max-width: 640px; }
+.label { display: block; margin-bottom: var(--s-2); }
+.input, .textarea {
+  width: 100%; padding: var(--s-3);
+  background: var(--surface-0); color: var(--l-white);
+  border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: .875rem;
+}
+.input { font-family: ui-monospace, monospace; }
+.warn { opacity: .72; }
