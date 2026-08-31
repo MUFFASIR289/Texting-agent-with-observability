@@ -12,13 +12,30 @@ handled by deterministic code.
 uv sync                             # create the venv and install
 cp .env.example .env                # then fill in your keys
 uv run python scripts/seed_data.py  # generate the synthetic customer database
-uv run texting-agent                # start the service on http://127.0.0.1:8000
+(cd web && npm install && npm run build)   # build the UI, once
+uv run texting-agent                # start everything
 ```
+
+Then open **http://127.0.0.1:8000**. One command, one port:
+
+| Path | |
+|---|---|
+| `/` | Landing page |
+| `/console` | Operator console — campaigns, approval, send log, ask the agent |
+| `/api/...` | The API, with its schema at `/api/docs` |
+
+The console reads `API_KEYS` from the same `.env` the service reads, so there is
+nothing to sign into.
+
+The API is Python and the UI is Node, so there are two processes. Only one is
+reachable: the API listens on `127.0.0.1:8001` for the UI to call over the
+loopback and is published to the browser at `/api` on the public port. Set
+`SERVE_UI=false` to run the API by itself on port 8000, as it was before.
 
 Check it:
 
 ```bash
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/api/health
 ```
 
 Run the tests:

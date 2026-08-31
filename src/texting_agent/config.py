@@ -29,7 +29,20 @@ class Settings(BaseSettings):
     env: str = "dev"                # "dev" gates the event-simulation endpoint (M8)
     log_level: str = "INFO"
     host: str = "127.0.0.1"
-    port: int = 8000
+
+    # One port is exposed - the UI's - and it is the only address anyone types.
+    # The API listens on api_port for the UI to reach over the loopback, and is
+    # published to the browser at /api on the public port. Two processes,
+    # because one is Python and one is Node; one door.
+    port: int = 8000                # public: the UI, and /api behind it
+    api_port: int = 8001            # loopback only, never typed
+    serve_ui: bool = True           # `texting-agent` starts the UI too
+
+    @property
+    def root_path(self) -> str:
+        """Behind the UI the API is published under /api, and FastAPI has to
+        know so its docs link at their own schema rather than the UI's root."""
+        return "/api" if self.serve_ui else ""
 
     config_dir: str = "config"      # scoring.yaml, playbooks.yaml
 

@@ -49,7 +49,10 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     # Authentication is applied to the whole app rather than route by route, so
     # a route added later is protected without anyone remembering to say so.
+    # root_path tells FastAPI it is mounted under /api, so /docs links at its
+    # own schema rather than at the UI's root.
     app = FastAPI(title="Texting Agent", lifespan=lifespan,
+                  root_path=settings.root_path,
                   dependencies=[Depends(authenticate)])
     errors.register(app)
     app.include_router(health.router)

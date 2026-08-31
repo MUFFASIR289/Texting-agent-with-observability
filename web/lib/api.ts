@@ -10,7 +10,10 @@ import { keyFor, type Role } from "./keys";
  * does and does not buy on a shared deployment.
  */
 
-const BASE = process.env.TEXTING_AGENT_URL ?? "http://127.0.0.1:8000";
+/* The service on the loopback. `texting-agent` sets this when it starts the UI;
+   the fallback is the same internal port for when the UI is run on its own. */
+const BASE = process.env.TEXTING_AGENT_URL
+  ?? `http://127.0.0.1:${process.env.API_INTERNAL_PORT ?? 8001}`;
 
 export class ApiError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) {
