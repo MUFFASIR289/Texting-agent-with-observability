@@ -1,0 +1,44 @@
+.head { margin-bottom: var(--s-6); }
+.title { font-weight: 600; margin-bottom: var(--s-2); }
+.sub { opacity: .72; }
+
+/* FR-42 — the approver signs content *and* audience, so the count sits next to
+   the decision rather than a screen away. */
+.signing {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--s-6);
+  padding: var(--s-6); margin-bottom: var(--s-6);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface-1);
+}
+.stat { display: grid; gap: var(--s-1); }
+.statN { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.statK { opacity: .68; }
+.hash { font-family: ui-monospace, monospace; font-size: .6875rem; word-break: break-all; opacity: .8; }
+
+.segment { margin-bottom: var(--s-8); }
+.segTitle { font-weight: 600; margin-bottom: var(--s-4); display: flex; gap: var(--s-3); align-items: baseline; flex-wrap: wrap; }
+
+/* Variants side by side, so an A/B pair is compared rather than remembered. */
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--s-4); }
+.variant { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.vHead { display: flex; gap: var(--s-3); align-items: center; padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--border); }
+.vBody { padding: var(--s-4); display: grid; gap: var(--s-4); }
+.subject { font-weight: 600; }
+.rendered { white-space: pre-wrap; line-height: 1.55; }
+.template {
+  white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: .75rem;
+  background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: var(--s-3); opacity: .85; margin: 0;
+}
+.cta { display: inline-block; padding: var(--s-2) var(--s-3); border: 1px solid var(--border); border-radius: var(--radius); }
+.sectionLabel { opacity: .62; }
+
+.decision { display: grid; gap: var(--s-4); }
+.noteInput {
+  width: 100%; padding: var(--s-3);
+  background: var(--surface-0); color: var(--l-white);
+  border: 1px solid var(--border); border-radius: var(--radius); font: inherit; font-size: .875rem;
+}
+.buttons { display: flex; gap: var(--s-3); flex-wrap: wrap; }
+.settled { opacity: .8; }

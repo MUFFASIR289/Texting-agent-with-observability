@@ -57,7 +57,9 @@ export type Variant = {
   label: string;
   subject_template: string | null;
   body_template: string;
-  preview: string | null;
+  /* Rendered by code against a sample customer, which is the point: the model
+     wrote {{first_name}} and never saw the value that lands here. */
+  preview: { subject: string | null; body: string; cta_text: string | null; cta_url: string | null } | null;
   preview_unavailable: string | null;
 };
 
