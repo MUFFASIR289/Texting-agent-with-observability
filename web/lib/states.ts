@@ -30,3 +30,20 @@ export const when = (iso: string | null) =>
 
 export const num = (n: number | null | undefined) =>
   n === null || n === undefined ? "—" : n.toLocaleString();
+
+/** The API sends these as JSON strings; a malformed one must not blank the page. */
+export function parseJson<T>(raw: string | null): T | null {
+  if (!raw) return null;
+  try { return JSON.parse(raw) as T; } catch { return null; }
+}
+
+export const channelList = (raw: string) =>
+  raw.split(",").map((c) => c.trim()).filter(Boolean);
+
+export type Offer = { type: string; value: number | null; code: string | null };
+export type Predicate = {
+  risk_levels?: string[];
+  value_tiers?: string[];
+  required_reason_codes?: string[];
+  [k: string]: unknown;
+};

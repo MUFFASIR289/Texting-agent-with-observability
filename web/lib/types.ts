@@ -30,10 +30,10 @@ export type Segment = {
   segment_id: string;
   name: string;
   priority: number;
-  predicate_json: string | Record<string, unknown>;
+  predicate_json: string;          // JSON, as a string
   playbook_id: string | null;
-  offer_json: string | Record<string, unknown> | null;
-  channels: string[] | string;
+  offer_json: string | null;       // JSON, as a string
+  channels: string;                // comma separated, e.g. "EMAIL,SMS"
   customer_count: number;
   rationale: string | null;
 };
