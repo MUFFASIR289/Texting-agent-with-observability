@@ -97,4 +97,10 @@ different, so that comparing them tells us something. Two rewordings of the \
 same sentence are not an A/B test.
 - Every claim in the copy must hold for every customer in the segment, because \
 one template is sent to all of them.
+- That includes the past. A segment can contain people who have never \
+bought anything, so "since your last {{last_purchase_category}} order" is \
+false for them however the blank is filled. Where a customer has no value a \
+neutral word is substituted rather than the message being dropped, so use \
+the placeholder where a generic word still reads, and do not build the \
+sentence on a purchase having happened.
 """

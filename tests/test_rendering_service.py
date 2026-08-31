@@ -113,6 +113,27 @@ def test_a_missing_offer_code_skips_rather_than_inventing_one(config):
                Channel.EMAIL, config)
 
 
+def test_a_customer_who_never_purchased_is_not_skipped_for_the_category(config):
+    """36% of the table has no last_purchase_category - the same people whose
+    last_purchase_at is null, because they have never bought anything. Left
+    with no fallback that skipped them one at a time. The fallback is a
+    category noun because that is the slot the model writes it into; an
+    adjective reads as broken in "your last purchase was in {{...}}"."""
+    rendered = render("Miss your {{last_purchase_category}} picks?",
+                      context(customer=customer(last_purchase_category=None)),
+                      Channel.EMAIL, config)
+    assert rendered == "Miss your essentials picks?"
+
+
+def test_the_generate_instructions_say_the_category_is_not_guaranteed(config):
+    """The fallback keeps the message sending; only the prompt can stop the
+    model writing a sentence that needs a real category to make sense."""
+    from texting_agent.agent import instructions
+
+    assert "never" in instructions.GENERATE
+    assert "last_purchase_category" in instructions.GENERATE
+
+
 def test_no_rendered_output_ever_contains_a_raw_placeholder(config):
     """The property that matters, stated directly."""
     templates = [

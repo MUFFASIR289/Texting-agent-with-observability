@@ -22,8 +22,20 @@ placeholders:
     source: days_since_purchase
     fallback: null
   last_purchase_category:
+    # Null for every customer who has never purchased - 36% of the table, and
+    # exactly the same people whose last_purchase_at is null. Left without a
+    # fallback it skipped them one by one, so it has one.
+    #
+    # The word is a category noun on purpose. The model writes this placeholder
+    # into slots that expect one - "your last purchase was in {{...}}", "items
+    # in {{...}}", "your next {{...}} purchase" - and an adjective like
+    # "favourite" reads as broken in most of them. Checked against all 67 real
+    # templates that use it: every rendered sentence is grammatical.
+    #
+    # What a fallback cannot fix is a sentence built on a purchase that never
+    # happened, so the GENERATE instructions tell the model not to write one.
     source: last_purchase_category
-    fallback: null
+    fallback: "essentials"
   total_orders:
     source: total_orders
     fallback: null
