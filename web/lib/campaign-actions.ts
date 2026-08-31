@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { api, ApiError } from "./api";
+import type { Role } from "./keys";
 
 /* Every mutation runs on the server, so the key stays server-side and the
  * browser ships no fetch code.
@@ -13,9 +14,9 @@ import { api, ApiError } from "./api";
  * flattened into "something went wrong".
  */
 
-async function run(path: string, body: unknown, back: string) {
+async function run(path: string, body: unknown, back: string, role: Role = "operator") {
   try {
-    await api(path, { method: "POST", body });
+    await api(path, { method: "POST", body, role });
   } catch (error) {
     if (error instanceof ApiError) {
       redirect(`${back}?error=${encodeURIComponent(`${error.code}: ${error.message}`)}`);
@@ -38,14 +39,15 @@ const note = (f: FormData) => {
  * HTML and works either way. */
 export async function decide(id: string, formData: FormData) {
   const decision = String(formData.get("decision") ?? "");
-  const paths: Record<string, [string, string]> = {
-    approve: [`/campaigns/${id}/approve`, `/console/c/${id}/approval`],
-    reject: [`/campaigns/${id}/reject`, `/console/c/${id}/approval`],
-    revise: [`/campaigns/${id}/revise`, `/console/c/${id}`],
+  // FR-41: approve and reject are the approver's to make; revise is not.
+  const paths: Record<string, [string, string, Role]> = {
+    approve: [`/campaigns/${id}/approve`, `/console/c/${id}/approval`, "approver"],
+    reject: [`/campaigns/${id}/reject`, `/console/c/${id}/approval`, "approver"],
+    revise: [`/campaigns/${id}/revise`, `/console/c/${id}`, "operator"],
   };
   const target = paths[decision];
   if (!target) redirect(`/console/c/${id}/approval?error=Unknown%20decision.`);
-  await run(target[0], note(formData), target[1]);
+  await run(target[0], note(formData), target[1], target[2]);
 }
 
 export async function cancel(id: string, formData: FormData) {

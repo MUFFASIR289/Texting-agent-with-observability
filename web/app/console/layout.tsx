@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { health, signedIn } from "@/lib/api";
-import { signOut } from "@/lib/auth-actions";
+import { health, keysAvailable } from "@/lib/api";
 import { Badge } from "@/components/ui";
 import styles from "./layout.module.css";
 
@@ -10,12 +8,7 @@ import styles from "./layout.module.css";
    inherits the ramp and the typeface, and none of the atmosphere. */
 
 export default async function ConsoleLayout({ children }: { children: React.ReactNode }) {
-  // Gate every console route here. Screens that only render a form - New and
-  // Ask - never call the API, so nothing else would trigger the key check and
-  // the shell would render as though someone were signed in.
-  if (!(await signedIn())) redirect("/signin");
-
-  const status = await health();
+  const [status, keyProblem] = [await health(), keysAvailable()];
 
   return (
     <div data-mode="console" className={styles.shell}>
@@ -34,9 +27,7 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
                 </Badge>
               : <Badge tone="error">SERVICE UNREACHABLE</Badge>}
           </span>
-          <form action={signOut}>
-            <button className={`ui ${styles.signout}`} type="submit">Sign out</button>
-          </form>
+          {keyProblem && <Badge tone="error">KEYS MISSING</Badge>}
         </div>
       </header>
       <main id="main" className={styles.main}>{children}</main>

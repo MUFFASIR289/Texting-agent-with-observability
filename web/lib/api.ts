@@ -1,19 +1,16 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { keyFor, type Role } from "./keys";
 
 /* Server-side only. Every call to the service happens here, on the server,
  * which is why the console needs no CORS and no browser-facing proxy: the
- * browser never talks to the API and never holds the key.
+ * browser never talks to the API and never sees a key.
  *
- * The key comes from an httpOnly cookie holding whatever the operator signed
- * in with. It is deliberately *not* read from an env var shared by everyone:
- * the backend separates the operator and approver roles, and a console holding
- * both keys would hand every visitor both roles and quietly undo that.
+ * The role is chosen per call, not per session, so the backend's separation
+ * still decides what each request may do - approve goes out under the approver
+ * key, everything else under the operator key. See lib/keys.ts for what that
+ * does and does not buy on a shared deployment.
  */
 
 const BASE = process.env.TEXTING_AGENT_URL ?? "http://127.0.0.1:8000";
-
-export const KEY_COOKIE = "ta_key";
 
 export class ApiError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) {
@@ -21,27 +18,19 @@ export class ApiError extends Error {
   }
 }
 
-async function key(): Promise<string> {
-  const value = (await cookies()).get(KEY_COOKIE)?.value;
-  if (!value) redirect("/signin");
-  return value;
-}
-
-type Options = { method?: string; body?: unknown; cache?: RequestCache };
+type Options = { method?: string; body?: unknown; role?: Role };
 
 export async function api<T>(path: string, options: Options = {}): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
     method: options.method ?? "GET",
     headers: {
-      "X-API-Key": await key(),
+      "X-API-Key": keyFor(options.role ?? "operator"),
       ...(options.body ? { "Content-Type": "application/json" } : {}),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
     // Campaign state changes under us, so nothing here is cacheable.
-    cache: options.cache ?? "no-store",
+    cache: "no-store",
   });
-
-  if (response.status === 401) redirect("/signin?expired=1");
 
   const text = await response.text();
   const payload = text ? JSON.parse(text) : {};
@@ -62,11 +51,6 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
   return payload as T;
 }
 
-/** True when a key is present — the console shell uses this, not the key itself. */
-export async function signedIn(): Promise<boolean> {
-  return Boolean((await cookies()).get(KEY_COOKIE)?.value);
-}
-
 /** Reachability and the boundary check, for the shell's status line. `/health` is public. */
 export async function health(): Promise<{ status: string; boundary_intact: boolean } | null> {
   try {
@@ -74,5 +58,16 @@ export async function health(): Promise<{ status: string; boundary_intact: boole
     return response.ok ? await response.json() : null;
   } catch {
     return null;
+  }
+}
+
+/** Whether the keys are readable at all — the shell says so rather than crashing. */
+export function keysAvailable(): string | null {
+  try {
+    keyFor("operator");
+    keyFor("approver");
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : "Keys unavailable.";
   }
 }
