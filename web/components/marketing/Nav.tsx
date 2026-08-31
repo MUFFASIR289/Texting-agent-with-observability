@@ -10,6 +10,7 @@ export function Nav() {
         <li><a href="#loop">The loop</a></li>
         <li><a href="#guardrails">Guardrails</a></li>
         <li><a href="#proof">Proof</a></li>
+        <li><a href="/console">Console</a></li>
       </ul>
       <a className={`ui ${styles.cta}`} href="#cta">Request access</a>
     </nav>

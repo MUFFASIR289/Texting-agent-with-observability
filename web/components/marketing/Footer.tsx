@@ -7,6 +7,7 @@ export function Footer() {
       <ul className={styles.links}>
         <li><a href="#loop">The loop</a></li>
         <li><a href="#guardrails">Guardrails</a></li>
+        <li><a href="/console">Console</a></li>
         <li><a href="/tokens">Design tokens</a></li>
       </ul>
     </footer>

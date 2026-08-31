@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 import type { CampaignDetail, Variant } from "@/lib/types";
 import { Badge, ErrorBox, ui } from "@/components/ui";
 import { canApprove, canReject, num, stateTone } from "@/lib/states";
-import { approve, reject, revise } from "@/lib/campaign-actions";
+import { decide } from "@/lib/campaign-actions";
 import styles from "./page.module.css";
 
 /* The approval screen — the product's centre of gravity (§9).
@@ -106,17 +106,17 @@ export default async function Approval({
       ))}
 
       {canApprove(c.state) || canReject(c.state) ? (
-        <form className={styles.decision}>
+        <form className={styles.decision} action={decide.bind(null, id)}>
           <label className="ui" htmlFor="note">Note (optional)</label>
           <input className={styles.noteInput} id="note" name="note" maxLength={500} />
           <div className={styles.buttons}>
-            <button className={`ui ${ui.button} ${ui.primary}`} formAction={approve.bind(null, id)}>
+            <button className={`ui ${ui.button} ${ui.primary}`} name="decision" value="approve">
               Approve {num(audience)} recipients
             </button>
-            <button className={`ui ${ui.button} ${ui.danger}`} formAction={reject.bind(null, id)}>
+            <button className={`ui ${ui.button} ${ui.danger}`} name="decision" value="reject">
               Reject
             </button>
-            <button className={`ui ${ui.button}`} formAction={revise.bind(null, id)}>
+            <button className={`ui ${ui.button}`} name="decision" value="revise">
               Send back for revision
             </button>
           </div>

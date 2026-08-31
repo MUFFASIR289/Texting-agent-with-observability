@@ -31,16 +31,21 @@ const note = (f: FormData) => {
   return value ? { note: value } : {};
 };
 
-export async function approve(id: string, formData: FormData) {
-  await run(`/campaigns/${id}/approve`, note(formData), `/console/c/${id}/approval`);
-}
-
-export async function reject(id: string, formData: FormData) {
-  await run(`/campaigns/${id}/reject`, note(formData), `/console/c/${id}/approval`);
-}
-
-export async function revise(id: string, formData: FormData) {
-  await run(`/campaigns/${id}/revise`, note(formData), `/console/c/${id}`);
+/* One action for all three decisions, dispatching on the button that was
+ * pressed. Three <button formAction> in a single form cannot be expressed in
+ * plain HTML, so React only wires them once it has hydrated - the buttons do
+ * nothing with JS disabled. A single form action plus name/value is ordinary
+ * HTML and works either way. */
+export async function decide(id: string, formData: FormData) {
+  const decision = String(formData.get("decision") ?? "");
+  const paths: Record<string, [string, string]> = {
+    approve: [`/campaigns/${id}/approve`, `/console/c/${id}/approval`],
+    reject: [`/campaigns/${id}/reject`, `/console/c/${id}/approval`],
+    revise: [`/campaigns/${id}/revise`, `/console/c/${id}`],
+  };
+  const target = paths[decision];
+  if (!target) redirect(`/console/c/${id}/approval?error=Unknown%20decision.`);
+  await run(target[0], note(formData), target[1]);
 }
 
 export async function cancel(id: string, formData: FormData) {
