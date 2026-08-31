@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  api:
+    name: API — tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.13
+
+      - name: Install
+        run: uv sync --locked --all-extras --dev
+
+      # The security suite ships with the boundary it protects, so it runs
+      # here with everything else rather than as a separate gate.
+      - name: Tests
+        run: uv run pytest -q
+
+  web:
+    name: Web — contrast, types, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # A9 — contrast verified by machine, not by eye. Reads the tokens
+      # straight out of styles/tokens.css, so a palette change is checked.
+      - name: Contrast
+        run: npm run check:contrast
+
+      - name: Types
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build

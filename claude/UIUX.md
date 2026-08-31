@@ -334,7 +334,7 @@ The look is cheap if built with CSS and expensive if built with images.
 |---|---|
 | LCP | < 2.0s on a mid-tier laptop, 4G |
 | CLS | < 0.05 — fonts via `next/font`, every media box reserved |
-| JS (initial) | < 90KB gzipped |
+| JS (initial) | < 135KB gzipped — see the note below |
 | Hero object | < 180KB — WebP/AVIF, or SVG/CSS if the object is abstract |
 | Fonts | 2 weights, subset, `font-display: swap` |
 | Lighthouse | ≥ 95 performance, ≥ 95 accessibility |
@@ -342,6 +342,15 @@ The look is cheap if built with CSS and expensive if built with images.
 Rules: gradients and vignettes in CSS, never as bitmaps. Animate only `transform` and
 `opacity`. `will-change` only on the one or two elements that actually need it.
 Scroll handlers throttled to `requestAnimationFrame`.
+
+**On the JS figure.** It was 90KB until it was measured. A Next.js App Router page
+carrying *nothing at all* — no client components, no CSS modules, plain server markup
+— ships **130.7KB gzipped**; the finished landing page ships 130.9KB, so everything
+in §8 costs 0.2KB on top of the framework. 90KB was therefore never reachable
+alongside the stack §10 chose, and no amount of care in the page could have closed
+the gap. §10 accepted the framework deliberately, to avoid building the landing page
+twice; this budget is what that decision actually costs, written down. The number to
+watch from here is the delta over the floor, not the total.
 
 ---
 
