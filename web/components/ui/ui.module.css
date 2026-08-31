@@ -1,0 +1,61 @@
+/* Shared console primitives (§10). Console mode: flat surfaces, maximum
+   legible density, 7:1 contrast, state changes only. */
+
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); }
+.cardPad { padding: var(--s-6); }
+.cardHead {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4);
+  padding: var(--s-4) var(--s-6); border-bottom: 1px solid var(--border); flex-wrap: wrap;
+}
+.cardTitle { font-weight: 600; }
+
+/* --- badge ---------------------------------------------------------------
+   A7 — the text is the signal. The tint only reinforces a word already there,
+   so a badge still reads correctly in monochrome or to a colourblind viewer. */
+.badge {
+  display: inline-block; white-space: nowrap;
+  padding: 2px var(--s-2); border-radius: var(--radius);
+  border: 1px solid currentColor;
+  font-size: .6875rem; font-weight: 600; letter-spacing: .02em;
+}
+.neutral { color: hsl(var(--hue) 12% 72%); }
+.ok      { color: var(--ok); }
+.warn    { color: var(--warn); }
+.error   { color: var(--error); }
+
+/* --- button -------------------------------------------------------------- */
+.button {
+  display: inline-block; padding: var(--s-2) var(--s-4);
+  border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--l-white);
+  font-size: .875rem; font-weight: 500;
+  transition: background 150ms;
+}
+.button:hover:not(:disabled) { background: var(--border); }
+.button:disabled { opacity: .45; cursor: not-allowed; }
+.primary { background: var(--l-white); color: var(--l-deep); border-color: var(--l-white); }
+.primary:hover:not(:disabled) { background: hsl(var(--hue) 20% 88%); }
+.danger { color: var(--error); border-color: currentColor; background: transparent; }
+
+/* --- table --------------------------------------------------------------- */
+.tableWrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: .8125rem; }
+.table th {
+  text-align: left; font-weight: 600; font-size: .6875rem;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--border);
+  color: hsl(var(--hue) 12% 78%); white-space: nowrap;
+}
+.table td { padding: var(--s-3) var(--s-4); border-bottom: 1px solid hsl(var(--hue) 14% 20%); vertical-align: top; }
+.table tbody tr:hover { background: var(--surface-2); }
+.num { font-variant-numeric: tabular-nums; text-align: right; }
+.mono { font-family: ui-monospace, "SF Mono", monospace; font-size: .75rem; }
+
+/* --- misc ---------------------------------------------------------------- */
+.empty { padding: var(--s-12); text-align: center; opacity: .65; }
+.errorBox {
+  border: 1px solid var(--error); border-radius: var(--radius);
+  padding: var(--s-4); color: var(--error); background: hsl(2 40% 14%);
+}
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: var(--s-2) var(--s-6); font-size: .8125rem; }
+.kvKey { opacity: .68; }

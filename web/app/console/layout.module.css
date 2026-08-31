@@ -1,0 +1,21 @@
+.shell { min-height: 100vh; background: var(--surface-0); color: var(--l-white); }
+
+.bar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: var(--s-6);
+  padding: var(--s-3) var(--s-6);
+  background: var(--surface-1); border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.brand { font-weight: 600; white-space: nowrap; }
+.brand span { color: var(--l-glow); }
+.links { display: flex; gap: var(--s-4); }
+.links a { opacity: .8; }
+.links a:hover { opacity: 1; }
+.right { margin-left: auto; display: flex; align-items: center; gap: var(--s-4); }
+.status { display: flex; align-items: center; gap: var(--s-2); opacity: .8; }
+.signout { opacity: .75; text-decoration: underline; }
+
+.main { padding: var(--s-8) var(--s-6); max-width: 1400px; margin: 0 auto; }
+
+@media (max-width: 720px) { .main { padding: var(--s-6) var(--s-4); } }

@@ -1,0 +1,6 @@
+.head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4); margin-bottom: var(--s-6); flex-wrap: wrap; }
+.title { font-weight: 600; }
+.count { opacity: .68; }
+.goal { max-width: 42ch; }
+.link { text-decoration: underline; text-underline-offset: 2px; }
+.needs { display: flex; align-items: center; gap: var(--s-2); }
